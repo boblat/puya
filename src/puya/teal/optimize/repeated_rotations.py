@@ -25,8 +25,8 @@ def _simplify_repeated_rotation_ops(
     return simplified, True
 
 
-def simplify_repeated_rotation_ops(block: models.TealBlock) -> bool:
-    result = block.ops.copy()
+def simplify_repeated_rotation_ops(ops: list[models.TealOp]) -> bool:
+    result = ops.copy()
     maybe_simplify = list[models.Cover | models.Uncover]()
     modified = False
     end_idx = 0
@@ -55,14 +55,14 @@ def simplify_repeated_rotation_ops(block: models.TealBlock) -> bool:
         preserve_stack_manipulations(
             result, slice(idx - len(maybe_simplify), idx), maybe_simplified
         )
-    block.ops[:] = result
+    ops[:] = result
     return modified
 
 
-def simplify_swap_ops(block: models.TealBlock) -> bool:
+def simplify_swap_ops(ops: list[models.TealOp]) -> bool:
     result = list[models.TealOp]()
     modified = False
-    for op in block.ops:
+    for op in ops:
         if isinstance(op, models.Cover | models.Uncover) and (op.n == 1):
             modified = True
             result.append(
@@ -72,5 +72,5 @@ def simplify_swap_ops(block: models.TealBlock) -> bool:
             )
         else:
             result.append(op)
-    block.ops[:] = result
+    ops[:] = result
     return modified

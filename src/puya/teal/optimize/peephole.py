@@ -12,11 +12,10 @@ from puya.teal.optimize._data import (
 from puya.utils import invert_ordered_binary_op
 
 
-def peephole(block: models.TealBlock, opt_level: int) -> bool:
+def peephole(ops: list[models.TealOp], stack_height: int, opt_level: int) -> bool:
     start_idx = 0
-    stack_height = block.entry_stack_height
     any_modified = False
-    result = block.ops.copy()
+    result = ops.copy()
     while start_idx < len(result):
         modified = False
         window: slice | None = None
@@ -39,7 +38,7 @@ def peephole(block: models.TealBlock, opt_level: int) -> bool:
         else:
             stack_height += result[start_idx].stack_height_delta
             start_idx += 1  # go to next
-    block.ops[:] = result
+    ops[:] = result
     return any_modified
 
 

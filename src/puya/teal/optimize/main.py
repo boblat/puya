@@ -65,25 +65,28 @@ def _optimize_subroutine(context: CompileContext, teal_sub: models.TealSubroutin
 
 def _optimize_block(block: models.TealBlock, *, level: int) -> None:
     modified = True
+    ops = block.ops.copy()
     while modified:
         modified = False
         if level > 0:
-            modified = perform_constant_stack_shuffling(block) or modified
-            modified = simplify_repeated_rotation_ops(block) or modified
-        modified = peephole(block, level) or modified
+            modified = perform_constant_stack_shuffling(ops) or modified
+            modified = simplify_repeated_rotation_ops(ops) or modified
+        modified = peephole(ops, block.entry_stack_height, level) or modified
 
     # we don't do dup/dupn collapse in the above loop, but after it.
     # it's easier to deal with expanded dup/dupn instructions above when looking at
     # stack shuffling etc, but once it's done we save ops / program size by collapsing them
-    constant_dupn_insertion(block)
-    constant_dup2_insertion(block)
+    constant_dupn_insertion(ops)
+    constant_dup2_insertion(ops)
     if level >= 2:
         # this is a brute-force search which can be slow at times,
         # so it's only done once and only at higher optimisation levels
-        block.ops[:] = repeated_rotation_ops_search(block.ops)
+        ops[:] = repeated_rotation_ops_search(ops)
 
     # simplifying uncover/cover 1 to swap is easier to do after other rotation optimizations
-    simplify_swap_ops(block)
+    simplify_swap_ops(ops)
+    if block.ops != ops:
+        block.ops[:] = ops
 
 
 def _inline_jump_chains(teal_sub: models.TealSubroutine) -> None:

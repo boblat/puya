@@ -6,8 +6,8 @@ from puya.teal._util import preserve_stack_manipulations
 from puya.teal.optimize._data import LOAD_OP_CODES
 
 
-def perform_constant_stack_shuffling(block: models.TealBlock) -> bool:
-    result = block.ops.copy()
+def perform_constant_stack_shuffling(ops: list[models.TealOp]) -> bool:
+    result = ops.copy()
     loads = list[models.TealOp]()
     loads_modified = modified = False
     start_idx = idx = 0
@@ -45,15 +45,15 @@ def perform_constant_stack_shuffling(block: models.TealBlock) -> bool:
     if loads_modified and loads:
         window = slice(start_idx, len(result))
         preserve_stack_manipulations(result, window, loads)
-    block.ops[:] = result
+    ops[:] = result
     return modified
 
 
-def constant_dupn_insertion(block: models.TealBlock) -> bool:
+def constant_dupn_insertion(ops: list[models.TealOp]) -> bool:
     result = list[models.TealOp]()
     loads = list[models.TealOp]()
     modified = False
-    for op in block.ops:
+    for op in ops:
         if loads and op == loads[0]:
             loads.append(op)
         else:
@@ -68,16 +68,16 @@ def constant_dupn_insertion(block: models.TealBlock) -> bool:
     if loads:
         modified = _collapse_loads(loads) or modified
         result.extend(loads)
-    block.ops[:] = result
+    ops[:] = result
     return modified
 
 
-def constant_dup2_insertion(block: models.TealBlock) -> bool:
-    result = block.ops
+def constant_dup2_insertion(ops: list[models.TealOp]) -> bool:
+    result = ops
     modified = False
     idx = 0
-    while (idx + 4) <= len(block.ops):
-        load_a, load_b, load_a2, load_b2 = block.ops[idx : idx + 4]
+    while (idx + 4) <= len(ops):
+        load_a, load_b, load_a2, load_b2 = ops[idx : idx + 4]
         if (
             _is_constant_load(load_a)
             and _is_constant_load(load_b)
@@ -92,7 +92,7 @@ def constant_dup2_insertion(block: models.TealBlock) -> bool:
             idx += 3
         else:
             idx += 1
-    block.ops[:] = result
+    ops[:] = result
     return modified
 
 
