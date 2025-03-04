@@ -126,6 +126,7 @@ from mypy.typeanal import (
     validate_instance,
 )
 from mypy.typeops import (
+    bind_self,
     callable_type,
     custom_special_method,
     erase_to_union_or_bound,
@@ -180,6 +181,7 @@ from mypy.types import (
     get_proper_type,
     get_proper_types,
     has_recursive_types,
+    has_type_vars,
     is_named_instance,
     split_with_prefix_and_suffix,
 )
@@ -354,7 +356,9 @@ class ExpressionChecker(ExpressionVisitor[Type]):
         """
         self.chk.module_refs.update(extract_refexpr_names(e))
         result = self.analyze_ref_expr(e)
-        return self.narrow_type_from_binder(e, result)
+        narrowed = self.narrow_type_from_binder(e, result)
+        self.chk.check_deprecated(e.node, e)
+        return narrowed
 
     def analyze_ref_expr(self, e: RefExpr, lvalue: bool = False) -> Type:
         result: Type | None = None
@@ -1479,6 +1483,8 @@ class ExpressionChecker(ExpressionVisitor[Type]):
             object_type=object_type,
         )
         proper_callee = get_proper_type(callee_type)
+        if isinstance(e.callee, (NameExpr, MemberExpr)):
+            self.chk.warn_deprecated_overload_item(e.callee.node, e, target=callee_type)
         if isinstance(e.callee, RefExpr) and isinstance(proper_callee, CallableType):
             # Cache it for find_isinstance_check()
             if proper_callee.type_guard is not None:
@@ -2370,7 +2376,11 @@ class ExpressionChecker(ExpressionVisitor[Type]):
                 # Positional argument when expecting a keyword argument.
                 self.msg.too_many_positional_arguments(callee, context)
                 ok = False
-            elif callee.param_spec() is not None and not formal_to_actual[i]:
+            elif (
+                callee.param_spec() is not None
+                and not formal_to_actual[i]
+                and callee.special_sig != "partial"
+            ):
                 self.msg.too_few_arguments(callee, context, actual_names)
                 ok = False
         return ok
@@ -2470,6 +2480,17 @@ class ExpressionChecker(ExpressionVisitor[Type]):
         check_arg = check_arg or self.check_arg
         # Keep track of consumed tuple *arg items.
         mapper = ArgTypeExpander(self.argument_infer_context())
+
+        for arg_type, arg_kind in zip(arg_types, arg_kinds):
+            arg_type = get_proper_type(arg_type)
+            if arg_kind == nodes.ARG_STAR and not self.is_valid_var_arg(arg_type):
+                self.msg.invalid_var_arg(arg_type, context)
+            if arg_kind == nodes.ARG_STAR2 and not self.is_valid_keyword_var_arg(arg_type):
+                is_mapping = is_subtype(
+                    arg_type, self.chk.named_type("_typeshed.SupportsKeysAndGetItem")
+                )
+                self.msg.invalid_keyword_var_arg(arg_type, is_mapping, context)
+
         for i, actuals in enumerate(formal_to_actual):
             orig_callee_arg_type = get_proper_type(callee.arg_types[i])
 
@@ -2562,15 +2583,6 @@ class ExpressionChecker(ExpressionVisitor[Type]):
                 if actual_type is None:
                     continue  # Some kind of error was already reported.
                 # Check that a *arg is valid as varargs.
-                if actual_kind == nodes.ARG_STAR and not self.is_valid_var_arg(actual_type):
-                    self.msg.invalid_var_arg(actual_type, context)
-                if actual_kind == nodes.ARG_STAR2 and not self.is_valid_keyword_var_arg(
-                    actual_type
-                ):
-                    is_mapping = is_subtype(
-                        actual_type, self.chk.named_type("_typeshed.SupportsKeysAndGetItem")
-                    )
-                    self.msg.invalid_keyword_var_arg(actual_type, is_mapping, context)
                 expanded_actual = mapper.expand_actual_type(
                     actual_type,
                     actual_kind,
@@ -2774,7 +2786,7 @@ class ExpressionChecker(ExpressionVisitor[Type]):
     ) -> list[CallableType]:
         """Returns all overload call targets that having matching argument counts.
 
-        If the given args contains a star-arg (*arg or **kwarg argument, including
+        If the given args contains a star-arg (*arg or **kwarg argument, except for
         ParamSpec), this method will ensure all star-arg overloads appear at the start
         of the list, instead of their usual location.
 
@@ -2809,7 +2821,9 @@ class ExpressionChecker(ExpressionVisitor[Type]):
                     # ParamSpec can be expanded in a lot of different ways. We may try
                     # to expand it here instead, but picking an impossible overload
                     # is safe: it will be filtered out later.
-                    star_matches.append(typ)
+                    # Unlike other var-args signatures, ParamSpec produces essentially
+                    # a fixed signature, so there's no need to push them to the top.
+                    matches.append(typ)
                 elif self.check_argument_count(
                     typ, arg_types, arg_kinds, arg_names, formal_to_actual, None
                 ):
@@ -3267,7 +3281,9 @@ class ExpressionChecker(ExpressionVisitor[Type]):
         """Visit member expression (of form e.id)."""
         self.chk.module_refs.update(extract_refexpr_names(e))
         result = self.analyze_ordinary_member_access(e, is_lvalue)
-        return self.narrow_type_from_binder(e, result)
+        narrowed = self.narrow_type_from_binder(e, result)
+        self.chk.warn_deprecated(e.node, e)
+        return narrowed
 
     def analyze_ordinary_member_access(self, e: MemberExpr, is_lvalue: bool) -> Type:
         """Analyse member expression or member lvalue."""
@@ -3957,7 +3973,7 @@ class ExpressionChecker(ExpressionVisitor[Type]):
             # This is the case even if the __add__ method is completely missing and the __radd__
             # method is defined.
 
-            variants_raw = [(left_op, left_type, right_expr)]
+            variants_raw = [(op_name, left_op, left_type, right_expr)]
         elif (
             is_subtype(right_type, left_type)
             and isinstance(left_type, Instance)
@@ -3978,19 +3994,25 @@ class ExpressionChecker(ExpressionVisitor[Type]):
             # As a special case, the alt_promote check makes sure that we don't use the
             # __radd__ method of int if the LHS is a native int type.
 
-            variants_raw = [(right_op, right_type, left_expr), (left_op, left_type, right_expr)]
+            variants_raw = [
+                (rev_op_name, right_op, right_type, left_expr),
+                (op_name, left_op, left_type, right_expr),
+            ]
         else:
             # In all other cases, we do the usual thing and call __add__ first and
             # __radd__ second when doing "A() + B()".
 
-            variants_raw = [(left_op, left_type, right_expr), (right_op, right_type, left_expr)]
+            variants_raw = [
+                (op_name, left_op, left_type, right_expr),
+                (rev_op_name, right_op, right_type, left_expr),
+            ]
 
         # STEP 3:
         # We now filter out all non-existent operators. The 'variants' list contains
         # all operator methods that are actually present, in the order that Python
         # attempts to invoke them.
 
-        variants = [(op, obj, arg) for (op, obj, arg) in variants_raw if op is not None]
+        variants = [(na, op, obj, arg) for (na, op, obj, arg) in variants_raw if op is not None]
 
         # STEP 4:
         # We now try invoking each one. If an operation succeeds, end early and return
@@ -3999,13 +4021,23 @@ class ExpressionChecker(ExpressionVisitor[Type]):
 
         errors = []
         results = []
-        for method, obj, arg in variants:
+        for name, method, obj, arg in variants:
             with self.msg.filter_errors(save_filtered_errors=True) as local_errors:
                 result = self.check_method_call(op_name, obj, method, [arg], [ARG_POS], context)
             if local_errors.has_new_errors():
                 errors.append(local_errors.filtered_errors())
                 results.append(result)
             else:
+                if isinstance(obj, Instance) and isinstance(
+                    defn := obj.type.get_method(name), OverloadedFuncDef
+                ):
+                    for item in defn.items:
+                        if (
+                            isinstance(item, Decorator)
+                            and isinstance(typ := item.func.type, CallableType)
+                            and bind_self(typ) == result[1]
+                        ):
+                            self.chk.check_deprecated(item.func, context)
                 return result
 
         # We finish invoking above operators and no early return happens. Therefore,
@@ -5581,11 +5613,15 @@ class ExpressionChecker(ExpressionVisitor[Type]):
         except KeyError:
             supports_index = self.chk.named_type("builtins.int")  # thanks, fixture life
         expected = make_optional_type(supports_index)
+        type_args = []
         for index in [e.begin_index, e.end_index, e.stride]:
             if index:
                 t = self.accept(index)
                 self.chk.check_subtype(t, expected, index, message_registry.INVALID_SLICE_INDEX)
-        return self.named_type("builtins.slice")
+                type_args.append(t)
+            else:
+                type_args.append(NoneType())
+        return self.chk.named_generic_type("builtins.slice", type_args)
 
     def visit_list_comprehension(self, e: ListComprehension) -> Type:
         return self.check_generator_or_comprehension(
@@ -5780,6 +5816,12 @@ class ExpressionChecker(ExpressionVisitor[Type]):
                 context=if_type_fallback,
                 allow_none_return=allow_none_return,
             )
+
+        # In most cases using if_type as a context for right branch gives better inferred types.
+        # This is however not the case for literal types, so use the full context instead.
+        if is_literal_type_like(full_context_else_type) and not is_literal_type_like(else_type):
+            else_type = full_context_else_type
+
         res: Type = make_simplified_union([if_type, else_type])
         if has_uninhabited_component(res) and not isinstance(
             get_proper_type(self.type_context[-1]), UnionType
@@ -6307,23 +6349,7 @@ class ArgInferSecondPassQuery(types.BoolTypeQuery):
 
     def visit_callable_type(self, t: CallableType) -> bool:
         # TODO: we need to check only for type variables of original callable.
-        return self.query_types(t.arg_types) or t.accept(HasTypeVarQuery())
-
-
-class HasTypeVarQuery(types.BoolTypeQuery):
-    """Visitor for querying whether a type has a type variable component."""
-
-    def __init__(self) -> None:
-        super().__init__(types.ANY_STRATEGY)
-
-    def visit_type_var(self, t: TypeVarType) -> bool:
-        return True
-
-    def visit_param_spec(self, t: ParamSpecType) -> bool:
-        return True
-
-    def visit_type_var_tuple(self, t: TypeVarTupleType) -> bool:
-        return True
+        return self.query_types(t.arg_types) or has_type_vars(t)
 
 
 def has_erased_component(t: Type | None) -> bool:

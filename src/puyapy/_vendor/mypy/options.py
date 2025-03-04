@@ -42,6 +42,7 @@ PER_MODULE_OPTIONS: Final = {
     "extra_checks",
     "follow_imports_for_stubs",
     "follow_imports",
+    "follow_untyped_imports",
     "ignore_errors",
     "ignore_missing_imports",
     "implicit_optional",
@@ -113,6 +114,8 @@ class Options:
         self.ignore_missing_imports = False
         # Is ignore_missing_imports set in a per-module section
         self.ignore_missing_imports_per_module = False
+        # Typecheck modules without stubs or py.typed marker
+        self.follow_untyped_imports = False
         self.follow_imports = "normal"  # normal|silent|skip|error
         # Whether to respect the follow_imports setting even for stub files.
         # Intended to be used for disabling specific stubs.
@@ -172,6 +175,9 @@ class Options:
         # Warn about returning objects of type Any when the function is
         # declared with a precise type
         self.warn_return_any = False
+
+        # Report importing or using deprecated features as errors instead of notes.
+        self.report_deprecated_as_note = False
 
         # Warn about unused '# type: ignore' comments
         self.warn_unused_ignores = False
@@ -397,17 +403,12 @@ class Options:
     def use_star_unpack(self) -> bool:
         return self.python_version >= (3, 11)
 
-    # To avoid breaking plugin compatibility, keep providing new_semantic_analyzer
-    @property
-    def new_semantic_analyzer(self) -> bool:
-        return True
-
     def snapshot(self) -> dict[str, object]:
         """Produce a comparable snapshot of this Option"""
         # Under mypyc, we don't have a __dict__, so we need to do worse things.
         d = dict(getattr(self, "__dict__", ()))
         for k in get_class_descriptors(Options):
-            if hasattr(self, k) and k != "new_semantic_analyzer":
+            if hasattr(self, k):
                 d[k] = getattr(self, k)
         # Remove private attributes from snapshot
         d = {k: v for k, v in d.items() if not k.startswith("_")}

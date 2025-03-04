@@ -17,6 +17,7 @@ from mypy.nodes import (
     ARG_POS,
     ARG_STAR,
     ARG_STAR2,
+    EXCLUDED_ENUM_ATTRIBUTES,
     SYMBOL_FUNCBASE_TYPES,
     Context,
     Decorator,
@@ -48,7 +49,6 @@ from mypy.typeops import (
     type_object_type_from_function,
 )
 from mypy.types import (
-    ENUM_REMOVED_PROPS,
     AnyType,
     CallableType,
     DeletedType,
@@ -317,9 +317,12 @@ def analyze_instance_member_access(
 
         if method.is_property:
             assert isinstance(method, OverloadedFuncDef)
-            first_item = method.items[0]
-            assert isinstance(first_item, Decorator)
-            return analyze_var(name, first_item.var, typ, info, mx)
+            getter = method.items[0]
+            assert isinstance(getter, Decorator)
+            if mx.is_lvalue and (len(items := method.items) > 1):
+                mx.chk.warn_deprecated(items[1], mx.context)
+            return analyze_var(name, getter.var, typ, info, mx)
+
         if mx.is_lvalue:
             mx.msg.cant_assign_to_method(mx.context)
         if not isinstance(method, OverloadedFuncDef):
@@ -494,6 +497,8 @@ def analyze_member_var_access(
     # It was not a method. Try looking up a variable.
     v = lookup_member_var_or_accessor(info, name, mx.is_lvalue)
 
+    mx.chk.warn_deprecated(v, mx.context)
+
     vv = v
     if isinstance(vv, Decorator):
         # The associated Var node of a decorator contains the type.
@@ -573,7 +578,11 @@ def analyze_member_var_access(
                     if hook:
                         result = hook(
                             AttributeContext(
-                                get_proper_type(mx.original_type), result, mx.context, mx.chk
+                                get_proper_type(mx.original_type),
+                                result,
+                                mx.is_lvalue,
+                                mx.context,
+                                mx.chk,
                             )
                         )
                     return result
@@ -629,7 +638,9 @@ def check_final_member(name: str, info: TypeInfo, msg: MessageBuilder, ctx: Cont
             msg.cant_assign_to_final(name, attr_assign=True, ctx=ctx)
 
 
-def analyze_descriptor_access(descriptor_type: Type, mx: MemberContext) -> Type:
+def analyze_descriptor_access(
+    descriptor_type: Type, mx: MemberContext, *, assignment: bool = False
+) -> Type:
     """Type check descriptor access.
 
     Arguments:
@@ -709,6 +720,12 @@ def analyze_descriptor_access(descriptor_type: Type, mx: MemberContext) -> Type:
         object_type=descriptor_type,
         callable_name=callable_name,
     )
+
+    if not assignment:
+        mx.chk.check_deprecated(dunder_get, mx.context)
+        mx.chk.warn_deprecated_overload_item(
+            dunder_get, mx.context, target=inferred_dunder_get_type, selftype=descriptor_type
+        )
 
     inferred_dunder_get_type = get_proper_type(inferred_dunder_get_type)
     if isinstance(inferred_dunder_get_type, AnyType):
@@ -830,7 +847,9 @@ def analyze_var(
         result = analyze_descriptor_access(result, mx)
     if hook:
         result = hook(
-            AttributeContext(get_proper_type(mx.original_type), result, mx.context, mx.chk)
+            AttributeContext(
+                get_proper_type(mx.original_type), result, mx.is_lvalue, mx.context, mx.chk
+            )
         )
     return result
 
@@ -1005,6 +1024,8 @@ def analyze_class_attribute_access(
         # on the class object itself rather than the instance.
         return None
 
+    mx.chk.warn_deprecated(node.node, mx.context)
+
     is_decorated = isinstance(node.node, Decorator)
     is_method = is_decorated or isinstance(node.node, FuncBase)
     if mx.is_lvalue:
@@ -1149,7 +1170,9 @@ def apply_class_attr_hook(
 ) -> Type | None:
     if hook:
         result = hook(
-            AttributeContext(get_proper_type(mx.original_type), result, mx.context, mx.chk)
+            AttributeContext(
+                get_proper_type(mx.original_type), result, mx.is_lvalue, mx.context, mx.chk
+            )
         )
     return result
 
@@ -1158,7 +1181,7 @@ def analyze_enum_class_attribute_access(
     itype: Instance, name: str, mx: MemberContext
 ) -> Type | None:
     # Skip these since Enum will remove it
-    if name in ENUM_REMOVED_PROPS:
+    if name in EXCLUDED_ENUM_ATTRIBUTES:
         return report_missing_attribute(mx.original_type, itype, name, mx)
     # Dunders and private names are not Enum members
     if name.startswith("__") and name.replace("_", "") != "":

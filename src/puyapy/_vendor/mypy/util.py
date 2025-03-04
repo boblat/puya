@@ -21,9 +21,8 @@ except ImportError:
     orjson = None
 
 try:
-    import curses
-
     import _curses  # noqa: F401
+    import curses
 
     CURSES_ENABLED = True
 except ImportError:
@@ -202,7 +201,7 @@ def trim_source_line(line: str, max_len: int, col: int, min_width: int) -> tuple
     A typical result looks like this:
         ...some_variable = function_to_call(one_arg, other_arg) or...
 
-    Return the trimmed string and the column offset to to adjust error location.
+    Return the trimmed string and the column offset to adjust error location.
     """
     if max_len < 2 * min_width + 1:
         # In case the window is too tiny it is better to still show something.
@@ -871,6 +870,18 @@ def is_typeshed_file(typeshed_dir: str | None, file: str) -> bool:
         return False
 
 
+def is_stdlib_file(typeshed_dir: str | None, file: str) -> bool:
+    if "stdlib" not in file:
+        # Fast path
+        return False
+    typeshed_dir = typeshed_dir if typeshed_dir is not None else TYPESHED_DIR
+    stdlib_dir = os.path.join(typeshed_dir, "stdlib")
+    try:
+        return os.path.commonpath((stdlib_dir, os.path.abspath(file))) == stdlib_dir
+    except ValueError:  # Different drives on Windows
+        return False
+
+
 def is_stub_package_file(file: str) -> bool:
     # Use hacky heuristics to check whether file is part of a PEP 561 stub package.
     if not file.endswith(".pyi"):
@@ -917,11 +928,17 @@ def quote_docstring(docstr: str) -> str:
 def json_dumps(obj: object, debug: bool = False) -> bytes:
     if orjson is not None:
         if debug:
-            return orjson.dumps(obj, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)  # type: ignore[no-any-return]
+            dumps_option = orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS
         else:
             # TODO: If we don't sort keys here, testIncrementalInternalScramble fails
             # We should document exactly what is going on there
-            return orjson.dumps(obj, option=orjson.OPT_SORT_KEYS)  # type: ignore[no-any-return]
+            dumps_option = orjson.OPT_SORT_KEYS
+
+        try:
+            return orjson.dumps(obj, option=dumps_option)  # type: ignore[no-any-return]
+        except TypeError as e:
+            if str(e) != "Integer exceeds 64-bit range":
+                raise
 
     if debug:
         return json.dumps(obj, indent=2, sort_keys=True).encode("utf-8")

@@ -80,7 +80,7 @@ class BoolExpressionBuilder(NotIterableInstanceExpressionBuilder):
         self, other: InstanceBuilder, op: BuilderComparisonOp, location: SourceLocation
     ) -> InstanceBuilder:
         if other.pytype != pytypes.BoolType:
-            return NotImplemented
+            return NotImplemented  # type: ignore[no-any-return]
         cmp_expr = NumericComparisonExpression(
             source_location=location,
             lhs=self.resolve(),

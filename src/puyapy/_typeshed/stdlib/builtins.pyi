@@ -9,6 +9,7 @@ from _typeshed import (
     ConvertibleToFloat,
     ConvertibleToInt,
     FileDescriptorOrPath,
+    MaybeNone,
     OpenBinaryMode,
     OpenBinaryModeReading,
     OpenBinaryModeUpdating,
@@ -93,6 +94,9 @@ _SupportsAnextT = TypeVar("_SupportsAnextT", bound=SupportsAnext[Any], covariant
 _AwaitableT = TypeVar("_AwaitableT", bound=Awaitable[Any])
 _AwaitableT_co = TypeVar("_AwaitableT_co", bound=Awaitable[Any], covariant=True)
 _P = ParamSpec("_P")
+_StartT = TypeVar("_StartT", covariant=True, default=Any)
+_StopT = TypeVar("_StopT", covariant=True, default=Any)
+_StepT = TypeVar("_StepT", covariant=True, default=Any)
 
 class object:
     __doc__: str | None
@@ -102,7 +106,7 @@ class object:
     @property
     def __class__(self) -> type[Self]: ...
     @__class__.setter
-    def __class__(self, type: type[object], /) -> None: ...
+    def __class__(self, type: type[Self], /) -> None: ...
     def __init__(self) -> None: ...
     def __new__(cls) -> Self: ...
     # N.B. `object.__setattr__` and `object.__delattr__` are heavily special-cased by type checkers.
@@ -786,7 +790,7 @@ class memoryview(Sequence[_I]):
     @overload
     def __setitem__(self, key: slice, value: ReadableBuffer, /) -> None: ...
     @overload
-    def __setitem__(self, key: SupportsIndex | tuple[SupportsIndex, ...], value: SupportsIndex, /) -> None: ...
+    def __setitem__(self, key: SupportsIndex | tuple[SupportsIndex, ...], value: _I, /) -> None: ...
     if sys.version_info >= (3, 10):
         def tobytes(self, order: Literal["C", "F", "A"] | None = "C") -> bytes: ...
     else:
@@ -798,6 +802,11 @@ class memoryview(Sequence[_I]):
     def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = ...) -> str: ...
     def __buffer__(self, flags: int, /) -> memoryview: ...
     def __release_buffer__(self, buffer: memoryview, /) -> None: ...
+
+    # These are inherited from the Sequence ABC, but don't actually exist on memoryview.
+    # See https://github.com/python/cpython/issues/125420
+    index: ClassVar[None]  # type: ignore[assignment]
+    count: ClassVar[None]  # type: ignore[assignment]
 
 @final
 class bool(int):
@@ -833,19 +842,31 @@ class bool(int):
     def __invert__(self) -> int: ...
 
 @final
-class slice:
+class slice(Generic[_StartT, _StopT, _StepT]):
     @property
-    def start(self) -> Any: ...
+    def start(self) -> _StartT: ...
     @property
-    def step(self) -> Any: ...
+    def step(self) -> _StepT: ...
     @property
-    def stop(self) -> Any: ...
+    def stop(self) -> _StopT: ...
     @overload
-    def __new__(cls, stop: Any, /) -> Self: ...
+    def __new__(cls, stop: int | None, /) -> slice[int | MaybeNone, int | MaybeNone, int | MaybeNone]: ...
     @overload
-    def __new__(cls, start: Any, stop: Any, step: Any = ..., /) -> Self: ...
+    def __new__(
+        cls, start: int | None, stop: int | None, step: int | None = None, /
+    ) -> slice[int | MaybeNone, int | MaybeNone, int | MaybeNone]: ...
+    @overload
+    def __new__(cls, stop: _T2, /) -> slice[Any, _T2, Any]: ...
+    @overload
+    def __new__(cls, start: _T1, stop: _T2, /) -> slice[_T1, _T2, Any]: ...
+    @overload
+    def __new__(cls, start: _T1, stop: _T2, step: _T3, /) -> slice[_T1, _T2, _T3]: ...
     def __eq__(self, value: object, /) -> bool: ...
-    __hash__: ClassVar[None]  # type: ignore[assignment]
+    if sys.version_info >= (3, 12):
+        def __hash__(self) -> int: ...
+    else:
+        __hash__: ClassVar[None]  # type: ignore[assignment]
+
     def indices(self, len: SupportsIndex, /) -> tuple[int, int, int]: ...
 
 class tuple(Sequence[_T_co]):
@@ -1110,7 +1131,7 @@ class frozenset(AbstractSet[_T_co]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 class enumerate(Iterator[tuple[int, _T]]):
-    def __new__(cls, iterable: Iterable[_T], start: int = ...) -> Self: ...
+    def __new__(cls, iterable: Iterable[_T], start: int = 0) -> Self: ...
     def __iter__(self) -> Self: ...
     def __next__(self) -> tuple[int, _T]: ...
     if sys.version_info >= (3, 9):
@@ -1165,9 +1186,7 @@ class property:
 
 @final
 class _NotImplementedType(Any):
-    # A little weird, but typing the __call__ as NotImplemented makes the error message
-    # for NotImplemented() much better
-    __call__: NotImplemented  # type: ignore[valid-type]  # pyright: ignore[reportInvalidTypeForm]
+    __call__: None
 
 NotImplemented: _NotImplementedType
 
@@ -1797,8 +1816,8 @@ class StopIteration(Exception):
     value: Any
 
 class OSError(Exception):
-    errno: int
-    strerror: str
+    errno: int | None
+    strerror: str | None
     # filename, filename2 are actually str | bytes | None
     filename: Any
     filename2: Any
@@ -1846,13 +1865,32 @@ class StopAsyncIteration(Exception):
 
 class SyntaxError(Exception):
     msg: str
+    filename: str | None
     lineno: int | None
     offset: int | None
     text: str | None
-    filename: str | None
+    # Errors are displayed differently if this attribute exists on the exception.
+    # The value is always None.
+    print_file_and_line: None
     if sys.version_info >= (3, 10):
         end_lineno: int | None
         end_offset: int | None
+
+    @overload
+    def __init__(self) -> None: ...
+    @overload
+    def __init__(self, msg: object, /) -> None: ...
+    # Second argument is the tuple (filename, lineno, offset, text)
+    @overload
+    def __init__(self, msg: str, info: tuple[str | None, int | None, int | None, str | None], /) -> None: ...
+    if sys.version_info >= (3, 10):
+        # end_lineno and end_offset must both be provided if one is.
+        @overload
+        def __init__(
+            self, msg: str, info: tuple[str | None, int | None, int | None, str | None, int | None, int | None], /
+        ) -> None: ...
+    # If you provide more than two arguments, it still creates the SyntaxError, but
+    # the arguments from the info tuple are not parsed. This form is omitted.
 
 class SystemError(Exception): ...
 class TypeError(Exception): ...

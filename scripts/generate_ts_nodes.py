@@ -95,7 +95,7 @@ def extract_type_name(_t: mypy.types.Type) -> str:
                 return "boolean"
             if type.fullname == "builtins.bytes":
                 return "Uint8Array"
-            if type.fullname == "_decimal.Decimal":
+            if type.fullname == "decimal.Decimal":
                 return "string"
             if type.fullname == "puya.awst.nodes.Label":
                 return "string"

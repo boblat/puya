@@ -27,7 +27,7 @@ class MetadataStore:
 
     @abstractmethod
     def getmtime(self, name: str) -> float:
-        """Read the mtime of a metadata entry..
+        """Read the mtime of a metadata entry.
 
         Raises FileNotFound if the entry does not exist.
         """
@@ -131,7 +131,7 @@ class FilesystemMetadataStore(MetadataStore):
         for dir, _, files in os.walk(self.cache_dir_prefix):
             dir = os.path.relpath(dir, self.cache_dir_prefix)
             for file in files:
-                yield os.path.join(dir, file)
+                yield os.path.normpath(os.path.join(dir, file))
 
 
 SCHEMA = """
