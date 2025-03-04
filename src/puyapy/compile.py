@@ -150,7 +150,7 @@ def get_mypy_options() -> mypy.options.Options:
 
     # disallow use of any
     mypy_opts.disallow_any_unimported = True
-    mypy_opts.disallow_any_expr = True
+    mypy_opts.disallow_any_expr = False  # this is broken for tuples
     mypy_opts.disallow_any_decorated = True
     mypy_opts.disallow_any_explicit = True
 
