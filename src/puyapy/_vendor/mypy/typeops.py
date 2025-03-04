@@ -8,7 +8,8 @@ NOTE: These must not be accessed from mypy.nodes or mypy.types to avoid import
 from __future__ import annotations
 
 import itertools
-from typing import Any, Iterable, List, Sequence, TypeVar, cast
+from collections.abc import Iterable, Sequence
+from typing import Any, TypeVar, cast
 
 from mypy.copytype import copy_type
 from mypy.expandtype import expand_type, expand_type_by_instance
@@ -1048,7 +1049,7 @@ def get_all_type_vars(tp: Type) -> list[TypeVarLikeType]:
     return tp.accept(TypeVarExtractor(include_all=True))
 
 
-class TypeVarExtractor(TypeQuery[List[TypeVarLikeType]]):
+class TypeVarExtractor(TypeQuery[list[TypeVarLikeType]]):
     def __init__(self, include_all: bool = False) -> None:
         super().__init__(self._merge)
         self.include_all = include_all

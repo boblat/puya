@@ -14,9 +14,10 @@ from __future__ import annotations
 import difflib
 import itertools
 import re
+from collections.abc import Collection, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from textwrap import dedent
-from typing import Any, Callable, Collection, Final, Iterable, Iterator, List, Sequence, cast
+from typing import Any, Callable, Final, cast
 
 import mypy.typeops
 from mypy import errorcodes as codes, message_registry
@@ -243,7 +244,7 @@ class MessageBuilder:
             TODO: address this in follow up PR
             """
             if isinstance(ctx, (ClassDef, FuncDef)):
-                return range(ctx.deco_line or ctx.line, ctx.line + 1)
+                return range(ctx.line, ctx.line + 1)
             elif not isinstance(ctx, Expression):
                 return [ctx.line]
             else:
@@ -954,7 +955,7 @@ class MessageBuilder:
                 msg = "Missing positional arguments"
             callee_name = callable_name(callee)
             if callee_name is not None and diff and all(d is not None for d in diff):
-                args = '", "'.join(cast(List[str], diff))
+                args = '", "'.join(cast(list[str], diff))
                 msg += f' "{args}" in call to {callee_name}'
             else:
                 msg = "Too few arguments" + for_function(callee)
@@ -1820,7 +1821,7 @@ class MessageBuilder:
         )
 
     def explicit_any(self, ctx: Context) -> None:
-        self.fail('Explicit "Any" is not allowed', ctx)
+        self.fail('Explicit "Any" is not allowed', ctx, code=codes.EXPLICIT_ANY)
 
     def unsupported_target_for_star_typeddict(self, typ: Type, ctx: Context) -> None:
         self.fail(
@@ -2700,7 +2701,7 @@ def format_type_inner(
         if func.is_type_obj():
             # The type of a type object type can be derived from the
             # return type (this always works).
-            return format(TypeType.make_normalized(erase_type(func.items[0].ret_type)))
+            return format(TypeType.make_normalized(func.items[0].ret_type))
         elif isinstance(func, CallableType):
             if func.type_guard is not None:
                 return_type = f"TypeGuard[{format(func.type_guard)}]"
