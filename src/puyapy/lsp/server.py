@@ -17,6 +17,7 @@ from puya.log import Log, LoggingContext, LogLevel, get_logger, logging_context
 from puya.parse import SourceLocation
 from puyapy.awst_build.main import transform_ast
 from puyapy.compile import determine_out_dir, get_python_executable, parse_with_mypy
+from puyapy.error_codes import ReplaceWithMember, ReplaceWithSymbol, WrapWithSymbol
 from puyapy.lsp import constants
 from puyapy.options import PuyaPyOptions
 from puyapy.parse import ParseResult
@@ -31,7 +32,7 @@ class PuyaPyLanguageServer(LanguageServer):
         super().__init__(name, version=version)
         logger.info(f"{name} - {version}")
         logger.debug(f"Server location: {__file__}")
-        self.diagnostics = dict[str, tuple[int | None, list[types.Diagnostic]]]()
+        self.diagnostics = dict[str, tuple[int | None, list[tuple[Log, types.Diagnostic]]]]()
         self.analysis_prefix: Path | None = None
         self.current_refresh_token = object()
 
@@ -47,7 +48,7 @@ class PuyaPyLanguageServer(LanguageServer):
         logs = self._parse_and_log(options)
 
         # need to include existing documents in diagnostics in case all errors are cleared
-        diagnostics: dict[str, tuple[int | None, list[types.Diagnostic]]] = {
+        diagnostics: dict[str, tuple[int | None, list[tuple[Log, types.Diagnostic]]]] = {
             uri: (self.workspace.get_text_document(uri).version, []) for uri in self.diagnostics
         }
         for log in logs:
@@ -57,11 +58,14 @@ class PuyaPyLanguageServer(LanguageServer):
                 version_diags = diagnostics.setdefault(uri, (doc.version, []))[1]
                 range_ = self._resolve_location(log.location)
                 version_diags.append(
-                    _diag(
-                        log.message,
-                        log.level,
-                        range_,
-                        data=self._get_source_code_data(uri, range_),
+                    (
+                        log,
+                        _diag(
+                            log.message,
+                            log.level,
+                            range_,
+                            data=self._get_source_code_data(uri, range_),
+                        ),
                     )
                 )
         self.diagnostics = diagnostics
@@ -172,6 +176,11 @@ class PuyaPyLanguageServer(LanguageServer):
                 algopy_paths.append(path)
         return algopy_paths
 
+    def resolve_alias(self, type_name: str) -> str | None:
+        # TODO: resolve type_name to correct alias in document
+        #       fall back to fully qualified type name if unknown
+        return type_name
+
 
 server = PuyaPyLanguageServer(constants.NAME, version=constants.VERSION)
 
@@ -202,7 +211,7 @@ def _refresh_diagnostics(ls: PuyaPyLanguageServer) -> None:
             types.PublishDiagnosticsParams(
                 uri=uri,
                 version=doc_version,
-                diagnostics=diagnostics,
+                diagnostics=[d[1] for d in diagnostics],
             )
         )
 
@@ -252,27 +261,62 @@ def code_actions(
     except KeyError:
         diagnostics = []
     for diag in diagnostics:
-        if diag.severity in (DiagnosticSeverity.Warning, DiagnosticSeverity.Error):
-            # POC - fix an int
-            if diag.message == "a Python literal is not valid at this location" and isinstance(
-                diag.data, dict
-            ):
-                source_code = diag.data.get("source_code", "")
-                # TODO: resolve algopy.UInt64 to correct alias in document
-                #       fall back to fully qualified type name if unknown
-                uint64_symbol = "UInt64"
-                fix = types.TextEdit(
-                    range=diag.range,
-                    new_text=f"{uint64_symbol}({source_code})",
+        error = diag[0].error
+        if not error or not error.location or not error.fix:
+            continue
+        loc = error.location
+        match error.fix:
+            case WrapWithSymbol(symbol=symbol):
+                symbol_alias = ls.resolve_alias(symbol) or symbol
+                assert loc.column is not None, "column must be set"
+                assert loc.end_column is not None, "end_column must be set"
+                wrap_start = types.Position(line=loc.line - 1, character=loc.column)
+                wrap_end_insert = types.Position(
+                    line=loc.end_line - 1, character=loc.end_column + 1
+                )
+                fix1 = types.TextEdit(
+                    range=types.Range(wrap_end_insert, wrap_end_insert),
+                    new_text=")",
+                )
+                fix2 = types.TextEdit(
+                    range=types.Range(wrap_start, wrap_start),
+                    new_text=f"{symbol_alias}(",
                 )
                 action = types.CodeAction(
-                    title="Use algopy.UInt64",
+                    title=f"Use {symbol}",
+                    kind=types.CodeActionKind.QuickFix,
+                    edit=types.WorkspaceEdit(changes={document_uri: [fix1, fix2]}),
+                )
+                items.append(action)
+            case ReplaceWithSymbol(symbol=symbol):
+                symbol_alias = ls.resolve_alias(symbol) or symbol
+                fix = types.TextEdit(
+                    range=_map_source_location(loc),
+                    new_text=symbol_alias,
+                )
+                action = types.CodeAction(
+                    title=f"Use {symbol}",
                     kind=types.CodeActionKind.QuickFix,
                     edit=types.WorkspaceEdit(changes={document_uri: [fix]}),
                 )
                 items.append(action)
-            else:
-                pass
+            case ReplaceWithMember(expr_location=expr_loc, member=member):
+                remove = types.TextEdit(
+                    range=_map_source_location(loc),
+                    new_text="",
+                )
+                end = _map_source_location(expr_loc).end
+                insert_at_end = attrs.evolve(end, character=end.character + 1)
+                append = types.TextEdit(
+                    range=types.Range(insert_at_end, insert_at_end),
+                    new_text=f".{member}",
+                )
+                action = types.CodeAction(
+                    title=f"Use .{member}",
+                    kind=types.CodeActionKind.QuickFix,
+                    edit=types.WorkspaceEdit(changes={document_uri: [append, remove]}),
+                )
+                items.append(action)
     return items
 
 
@@ -289,6 +333,15 @@ def _diag(
         source=constants.NAME,
         data=data,
     )
+
+
+def _map_source_location(loc: SourceLocation) -> types.Range:
+    assert loc.column is not None, "column must be set"
+    assert loc.end_column is not None, "end_column must be set"
+    assert loc.end_line is not None, "end_line must be set"
+    start = types.Position(loc.line - 1, loc.column)
+    end = types.Position(loc.end_line - 1, loc.end_column)
+    return types.Range(start=start, end=end)
 
 
 def _map_severity(log_level: LogLevel) -> DiagnosticSeverity:
