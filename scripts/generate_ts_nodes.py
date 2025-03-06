@@ -3,12 +3,20 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 import attrs
+import mypy.build
+import mypy.find_sources
+import mypy.fscache
+import mypy.modulefinder
 import mypy.nodes
 import mypy.types
+import mypy.util
 from mypy.options import NEW_GENERIC_SYNTAX
 
+from puya import log
 from puyapy.compile import _get_python_executable
-from puyapy.parse import SourceModule, parse_and_typecheck
+from puyapy.parse import _parse_log_message
+
+logger = log.get_logger(__name__)
 
 
 @attrs.define
@@ -16,6 +24,14 @@ class TsType:
     name: str
     base_types: list[str] = attrs.field(factory=list)
     fields: dict[str, str] = attrs.field(factory=dict)
+
+
+@attrs.frozen
+class SourceModule:
+    name: str
+    node: mypy.nodes.MypyFile
+    path: Path
+    lines: Sequence[str] | None
 
 
 def safe_name(name: str) -> str:
@@ -365,6 +381,111 @@ def get_mypy_options() -> mypy.options.Options:
     mypy_opts.pretty = True  # show source in output
 
     return mypy_opts
+
+
+_MYPY_FSCACHE = mypy.fscache.FileSystemCache()
+
+
+def parse_and_typecheck(
+    paths: Sequence[Path], mypy_options: mypy.options.Options
+) -> tuple[mypy.build.BuildManager, dict[str, SourceModule]]:
+    """Generate the ASTs from the build sources, and all imported modules (recursively)"""
+
+    # ensure we have the absolute, canonical paths to the files
+    resolved_input_paths = {p.resolve() for p in paths}
+    # creates a list of BuildSource objects from the contract Paths
+    mypy_build_sources = mypy.find_sources.create_source_list(
+        paths=[str(p) for p in resolved_input_paths],
+        options=mypy_options,
+        fscache=_MYPY_FSCACHE,
+    )
+    result = _mypy_build(mypy_build_sources, mypy_options, _MYPY_FSCACHE)
+    # Sometimes when we call back into mypy, there might be errors.
+    # We don't want to crash when that happens.
+    result.manager.errors.set_file("<puyapy>", module=None, scope=None, options=mypy_options)
+    missing_module_names = {s.module for s in mypy_build_sources} - result.manager.modules.keys()
+    # Note: this shouldn't happen, provided we've successfully disabled the mypy cache
+    assert (
+        not missing_module_names
+    ), f"mypy parse failed, missing modules: {', '.join(missing_module_names)}"
+
+    # order modules by dependency, and also sanity check the contents
+    ordered_modules = {}
+    for scc_module_names in mypy.build.sorted_components(result.graph):
+        for module_name in scc_module_names:
+            module = result.manager.modules[module_name]
+            assert (
+                module_name == module.fullname
+            ), f"mypy module mismatch, expected {module_name}, got {module.fullname}"
+            assert module.path, f"no path for mypy module: {module_name}"
+            module_path = Path(module.path).resolve()
+            if module_path.is_dir():
+                # this module is a module directory with no __init__.py, ie it contains
+                # nothing and is only in the graph as a reference
+                pass
+            else:
+                lines = mypy.util.read_py_file(str(module_path), _MYPY_FSCACHE.read)
+                ordered_modules[module_name] = SourceModule(
+                    name=module_name, node=module, path=module_path, lines=lines
+                )
+
+    return result.manager, ordered_modules
+
+
+def _mypy_build(
+    sources: list[mypy.modulefinder.BuildSource],
+    options: mypy.options.Options,
+    fscache: mypy.fscache.FileSystemCache | None,
+) -> mypy.build.BuildResult:
+    """Simple wrapper around mypy.build.build
+
+    Makes it so that check errors and parse errors are handled the same (ie with an exception)
+    """
+
+    all_messages = list[str]()
+
+    def flush_errors(
+        _filename: str | None,
+        new_messages: list[str],
+        _is_serious: bool,  # noqa: FBT001
+    ) -> None:
+        all_messages.extend(msg for msg in new_messages if os.devnull not in msg)
+
+    try:
+        result = mypy.build.build(
+            sources=sources,
+            options=options,
+            flush_errors=flush_errors,
+            fscache=fscache,
+        )
+    finally:
+        _log_mypy_messages(all_messages)
+    return result
+
+
+def _log_mypy_message(message: log.Log | None, related_lines: list[str]) -> None:
+    if not message:
+        return
+    logger.log(
+        message.level, message.message, location=message.location, related_lines=related_lines
+    )
+
+
+def _log_mypy_messages(messages: list[str]) -> None:
+    first_message: log.Log | None = None
+    related_messages = list[str]()
+    for message_str in messages:
+        message = _parse_log_message(message_str)
+        if not first_message:
+            first_message = message
+        elif not message.location:
+            # collate related error messages and log together
+            related_messages.append(message.message)
+        else:
+            _log_mypy_message(first_message, related_messages)
+            related_messages = []
+            first_message = message
+    _log_mypy_message(first_message, related_messages)
 
 
 def parse_with_mypy(paths: Sequence[Path]) -> dict[str, SourceModule]:

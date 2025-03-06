@@ -6,9 +6,9 @@ import typing
 from collections.abc import Sequence
 
 import attrs
-import mypy.nodes
 import typing_extensions
 
+import nypy.nodes
 from puya import log
 from puya.awst.nodes import (
     BinaryBooleanOperator,
@@ -84,7 +84,7 @@ class CallableBuilder(NodeBuilder, abc.ABC):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[mypy.nodes.ArgKind],
+        arg_kinds: list[nypy.nodes.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:

@@ -1,6 +1,5 @@
 [run]
 source = src/
-omit = src/puyapy/_vendor/*
 
 [report]
 show_missing = true

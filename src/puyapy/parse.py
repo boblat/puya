@@ -10,15 +10,15 @@ from pathlib import Path
 
 import attrs
 import docstring_parser
-import mypy.build
-import mypy.errors
-import mypy.find_sources
-import mypy.fscache
-import mypy.modulefinder
-import mypy.nodes
-import mypy.options
-import mypy.util
 
+import nypy.build
+import nypy.errors
+import nypy.find_sources
+import nypy.fscache
+import nypy.modulefinder
+import nypy.nodes
+import nypy.options
+import nypy.util
 from puya import log
 from puya.awst.nodes import MethodDocumentation
 from puya.parse import SourceLocation
@@ -31,7 +31,7 @@ logger = log.get_logger(__name__)
 _PUYAPY_SRC_ROOT = Path(__file__).parent
 _PUYA_SRC_ROOT = _PUYAPY_SRC_ROOT.parent / "puya"
 TYPESHED_PATH = _PUYAPY_SRC_ROOT / "_typeshed"
-_MYPY_FSCACHE = mypy.fscache.FileSystemCache()
+_MYPY_FSCACHE = nypy.fscache.FileSystemCache()
 _MYPY_SEVERITY_TO_LOG_LEVEL = {
     "error": log.LogLevel.error,
     "warning": log.LogLevel.warning,
@@ -64,7 +64,7 @@ class SourceDiscoveryMechanism(enum.Enum):
 @attrs.frozen
 class SourceModule:
     name: str
-    node: mypy.nodes.MypyFile
+    node: nypy.nodes.MypyFile
     path: Path
     lines: Sequence[str] | None
     discovery_mechanism: SourceDiscoveryMechanism
@@ -72,7 +72,7 @@ class SourceModule:
 
 @attrs.frozen
 class ParseResult:
-    mypy_options: mypy.options.Options
+    mypy_options: nypy.options.Options
     ordered_modules: Mapping[str, SourceModule]
     """All discovered modules, topologically sorted by dependencies.
     The sort order is from leaves (nodes without dependencies) to
@@ -92,14 +92,14 @@ class ParseResult:
 
 
 def parse_and_typecheck(
-    paths: Sequence[Path], mypy_options: mypy.options.Options
-) -> tuple[mypy.build.BuildManager, dict[str, SourceModule]]:
+    paths: Sequence[Path], mypy_options: nypy.options.Options
+) -> tuple[nypy.build.BuildManager, dict[str, SourceModule]]:
     """Generate the ASTs from the build sources, and all imported modules (recursively)"""
 
     # ensure we have the absolute, canonical paths to the files
     resolved_input_paths = {p.resolve() for p in paths}
     # creates a list of BuildSource objects from the contract Paths
-    mypy_build_sources = mypy.find_sources.create_source_list(
+    mypy_build_sources = nypy.find_sources.create_source_list(
         paths=[str(p) for p in resolved_input_paths],
         options=mypy_options,
         fscache=_MYPY_FSCACHE,
@@ -119,7 +119,7 @@ def parse_and_typecheck(
 
     # order modules by dependency, and also sanity check the contents
     ordered_modules = {}
-    for scc_module_names in mypy.build.sorted_components(result.graph):
+    for scc_module_names in nypy.build.sorted_components(result.graph):
         for module_name in scc_module_names:
             module = result.manager.modules[module_name]
             assert (
@@ -133,7 +133,7 @@ def parse_and_typecheck(
                 pass
             else:
                 _check_encoding(_MYPY_FSCACHE, module_path)
-                lines = mypy.util.read_py_file(str(module_path), _MYPY_FSCACHE.read)
+                lines = nypy.util.read_py_file(str(module_path), _MYPY_FSCACHE.read)
                 if module_path in resolved_input_paths:
                     discovery_mechanism = SourceDiscoveryMechanism.explicit_file
                 elif module_path in build_source_paths:
@@ -151,7 +151,7 @@ def parse_and_typecheck(
     return result.manager, ordered_modules
 
 
-def _check_encoding(mypy_fscache: mypy.fscache.FileSystemCache, module_path: Path) -> None:
+def _check_encoding(mypy_fscache: nypy.fscache.FileSystemCache, module_path: Path) -> None:
     module_rel_path = make_path_relative_to_cwd(module_path)
     module_loc = SourceLocation(file=module_path, line=1)
     try:
@@ -167,7 +167,7 @@ def _check_encoding(mypy_fscache: mypy.fscache.FileSystemCache, module_path: Pat
     if source.startswith(b"\xef\xbb\xbf"):
         return
     # otherwise look at first two lines and check if PEP-263 coding is present
-    encoding, _ = mypy.util.find_python_encoding(source)
+    encoding, _ = nypy.util.find_python_encoding(source)
     # find the codec for this encoding and check it is utf-8
     codec = codecs.lookup(encoding)
     if codec.name != "utf-8":
@@ -180,10 +180,10 @@ def _check_encoding(mypy_fscache: mypy.fscache.FileSystemCache, module_path: Pat
 
 
 def _mypy_build(
-    sources: list[mypy.modulefinder.BuildSource],
-    options: mypy.options.Options,
-    fscache: mypy.fscache.FileSystemCache | None,
-) -> mypy.build.BuildResult:
+    sources: list[nypy.modulefinder.BuildSource],
+    options: nypy.options.Options,
+    fscache: nypy.fscache.FileSystemCache | None,
+) -> nypy.build.BuildResult:
     """Simple wrapper around mypy.build.build
 
     Makes it so that check errors and parse errors are handled the same (ie with an exception)
@@ -199,7 +199,7 @@ def _mypy_build(
         all_messages.extend(msg for msg in new_messages if os.devnull not in msg)
 
     try:
-        result = mypy.build.build(
+        result = nypy.build.build(
             sources=sources,
             options=options,
             flush_errors=flush_errors,
@@ -304,14 +304,14 @@ def parse_docstring(docstring_raw: str | None) -> MethodDocumentation:
     )
 
 
-def source_location_from_mypy(file: Path, node: mypy.nodes.Context) -> SourceLocation:
+def source_location_from_mypy(file: Path, node: nypy.nodes.Context) -> SourceLocation:
     assert node.line is not None
     assert node.line >= 1
 
     match node:
         case (
-            mypy.nodes.FuncDef(body=body)
-            | mypy.nodes.Decorator(func=mypy.nodes.FuncDef(body=body))
+            nypy.nodes.FuncDef(body=body)
+            | nypy.nodes.Decorator(func=nypy.nodes.FuncDef(body=body))
         ):
             # end_line of a function node includes the entire body
             # try to get just the signature
@@ -327,7 +327,7 @@ def source_location_from_mypy(file: Path, node: mypy.nodes.Context) -> SourceLoc
                 line=node.line,
                 end_line=end_line,
             )
-        case mypy.nodes.ClassDef(decorators=class_decorators, defs=class_body):
+        case nypy.nodes.ClassDef(decorators=class_decorators, defs=class_body):
             line = node.line
             for dec in class_decorators:
                 line = min(dec.line, line)
@@ -337,13 +337,13 @@ def source_location_from_mypy(file: Path, node: mypy.nodes.Context) -> SourceLoc
                 line=line,
                 end_line=end_line,
             )
-        case mypy.nodes.WhileStmt(body=compound_body) | mypy.nodes.ForStmt(body=compound_body):
+        case nypy.nodes.WhileStmt(body=compound_body) | nypy.nodes.ForStmt(body=compound_body):
             return SourceLocation(
                 file=file,
                 line=node.line,
                 end_line=compound_body.line - 1,
             )
-        case mypy.nodes.IfStmt(body=[*bodies], else_body=else_body):
+        case nypy.nodes.IfStmt(body=[*bodies], else_body=else_body):
             body_start: int | None = None
             if else_body is not None:
                 bodies.append(else_body)

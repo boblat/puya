@@ -2,8 +2,7 @@ import abc
 import typing
 from collections.abc import Sequence
 
-import mypy.nodes
-
+import nypy.nodes
 from puya import log
 from puya.awst.nodes import (
     Copy,
@@ -33,7 +32,7 @@ class InnerTxnParamsTypeBuilder(TypeBuilder[pytypes.InnerTransactionFieldsetType
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[mypy.nodes.ArgKind],
+        arg_kinds: list[nypy.nodes.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -89,7 +88,7 @@ class _Submit(_MemberFunction):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[mypy.nodes.ArgKind],
+        arg_kinds: list[nypy.nodes.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -104,7 +103,7 @@ class _Copy(_MemberFunction):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[mypy.nodes.ArgKind],
+        arg_kinds: list[nypy.nodes.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -118,7 +117,7 @@ class _Set(_MemberFunction):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[mypy.nodes.ArgKind],
+        arg_kinds: list[nypy.nodes.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:

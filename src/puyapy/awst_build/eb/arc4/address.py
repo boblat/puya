@@ -1,8 +1,7 @@
 import typing
 from collections.abc import Sequence
 
-import mypy.nodes
-
+import nypy.nodes
 from puya import log, utils
 from puya.algo_constants import ENCODED_ADDRESS_LENGTH
 from puya.awst import wtypes
@@ -60,7 +59,7 @@ class AddressTypeBuilder(BytesBackedTypeBuilder[pytypes.ArrayType]):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[mypy.nodes.ArgKind],
+        arg_kinds: list[nypy.nodes.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:

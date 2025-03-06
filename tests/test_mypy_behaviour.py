@@ -4,31 +4,31 @@ import inspect
 import typing
 from textwrap import dedent
 
-import mypy.build
-import mypy.find_sources
-import mypy.fscache
-import mypy.nodes
-import mypy.options
-import mypy.types
+import nypy.build
+import nypy.find_sources
+import nypy.fscache
+import nypy.nodes
+import nypy.options
+import nypy.types
 import pytest
-from mypy.nodes import RevealExpr
+from nypy.nodes import RevealExpr
 
 from puyapy.compile import get_mypy_options
 
 
-def get_assignment_var_named(mypy_file: mypy.nodes.MypyFile, name: str) -> mypy.nodes.Var:
+def get_assignment_var_named(mypy_file: nypy.nodes.MypyFile, name: str) -> nypy.nodes.Var:
     for assignment in [
-        stmt for stmt in mypy_file.defs if isinstance(stmt, mypy.nodes.AssignmentStmt)
+        stmt for stmt in mypy_file.defs if isinstance(stmt, nypy.nodes.AssignmentStmt)
     ]:
         for lvalue in assignment.lvalues:
-            if isinstance(lvalue, mypy.nodes.NameExpr) and lvalue.name == name:
-                assert isinstance(lvalue.node, mypy.nodes.Var)
+            if isinstance(lvalue, nypy.nodes.NameExpr) and lvalue.name == name:
+                assert isinstance(lvalue.node, nypy.nodes.Var)
                 return lvalue.node
     raise Exception(f"Assignment to '{name}' not found")
 
 
-def get_class_by_name(mypy_file: mypy.nodes.MypyFile, name: str) -> mypy.nodes.ClassDef:
-    for cls_def in (stmt for stmt in mypy_file.defs if isinstance(stmt, mypy.nodes.ClassDef)):
+def get_class_by_name(mypy_file: nypy.nodes.MypyFile, name: str) -> nypy.nodes.ClassDef:
+    for cls_def in (stmt for stmt in mypy_file.defs if isinstance(stmt, nypy.nodes.ClassDef)):
         if cls_def.name == name:
             return cls_def
     raise Exception(f"Assignment to '{name}' not found")
@@ -42,30 +42,30 @@ def decompile(function: typing.Callable) -> str:
 TEST_MODULE = "__test__"
 
 
-def mypy_parse_and_type_check(source: str | typing.Callable) -> mypy.build.BuildResult:
+def mypy_parse_and_type_check(source: str | typing.Callable) -> nypy.build.BuildResult:
     code = source if isinstance(source, str) else decompile(source)
     options = get_mypy_options()
     options.export_types = True
 
-    sources = [mypy.build.BuildSource(None, TEST_MODULE, text=dedent(code))]
+    sources = [nypy.build.BuildSource(None, TEST_MODULE, text=dedent(code))]
 
-    return mypy.build.build(sources=sources, options=options)
+    return nypy.build.build(sources=sources, options=options)
 
 
-def strip_error_prefixes(br: mypy.build.BuildResult) -> list[str]:
+def strip_error_prefixes(br: nypy.build.BuildResult) -> list[str]:
     return [e.split(":", maxsplit=2)[-1].strip() for e in br.errors]
 
 
 def get_revealed_types(
-    br: mypy.build.BuildResult, tree: mypy.nodes.MypyFile
-) -> list[mypy.types.Type | None]:
-    import mypy.traverser
+    br: nypy.build.BuildResult, tree: nypy.nodes.MypyFile
+) -> list[nypy.types.Type | None]:
+    import nypy.traverser
 
     types = []
 
-    class MyVisitor(mypy.traverser.TraverserVisitor):
+    class MyVisitor(nypy.traverser.TraverserVisitor):
         def visit_reveal_expr(self, o: RevealExpr) -> None:
-            types.append(br.types.get(o.expr, mypy.types.UninhabitedType()))
+            types.append(br.types.get(o.expr, nypy.types.UninhabitedType()))
 
     visitor = MyVisitor()
     visitor.visit_mypy_file(tree)
@@ -156,10 +156,10 @@ def test_name_defined():
     result = mypy_parse_and_type_check(test)
     tree = result.graph[TEST_MODULE].tree
     match tree:
-        case mypy.nodes.MypyFile(
+        case nypy.nodes.MypyFile(
             defs=[
-                mypy.nodes.AssignmentStmt(
-                    rvalue=mypy.nodes.OpExpr(left=mypy.nodes.NameExpr(name="missing") as missing),
+                nypy.nodes.AssignmentStmt(
+                    rvalue=nypy.nodes.OpExpr(left=nypy.nodes.NameExpr(name="missing") as missing),
                 )
             ]
         ):
@@ -288,7 +288,7 @@ def test_class_members() -> None:
     tree = result.graph[TEST_MODULE].tree
     assert tree
     cls_def = tree.defs[1]
-    assert isinstance(cls_def, mypy.nodes.ClassDef)
+    assert isinstance(cls_def, nypy.nodes.ClassDef)
     symtable = cls_def.info.names.copy()
     del symtable["__init__"]
     del symtable["method"]
@@ -307,12 +307,12 @@ def test_class_members() -> None:
     }
     vars_ = {}
     for name, sym in symtable.items():
-        assert sym.kind == mypy.nodes.MDEF  # THE M STANDS FOR MEMBER.. REMEMBER... REMEMMMMBEERRR
+        assert sym.kind == nypy.nodes.MDEF  # THE M STANDS FOR MEMBER.. REMEMBER... REMEMMMMBEERRR
         if name.startswith("new_"):
             assert sym.implicit
         else:
             assert not sym.implicit
-        assert isinstance(sym.node, mypy.nodes.Var)
+        assert isinstance(sym.node, nypy.nodes.Var)
         # unfortunate that implicit class vars and not detected as such :(
         assert sym.node.is_classvar == (name == "class_var")
         # can't use is_initialized_in_class either, it is True even when it's just declared
@@ -321,7 +321,7 @@ def test_class_members() -> None:
         )
         vars_[name] = sym.node
     # note this does nothing v
-    typing.assert_type(vars_, dict[str, mypy.nodes.Var])
+    typing.assert_type(vars_, dict[str, nypy.nodes.Var])
 
 
 def test_abc() -> None:
@@ -425,9 +425,9 @@ def test_final_method() -> None:
     tree = result.graph[TEST_MODULE].tree
     assert tree
     class_def = tree.defs[-1]
-    assert isinstance(class_def, mypy.nodes.ClassDef)
+    assert isinstance(class_def, nypy.nodes.ClassDef)
     deco = class_def.defs.body[0]
-    assert isinstance(deco, mypy.nodes.Decorator)
+    assert isinstance(deco, nypy.nodes.Decorator)
     assert deco.decorators == []
     assert deco.is_final
     assert deco.func.is_final
@@ -445,7 +445,7 @@ def test_notypecheck_func() -> None:
     tree = result.graph[TEST_MODULE].tree
     assert tree
     deco = tree.defs[-1]
-    assert isinstance(deco, mypy.nodes.Decorator)
+    assert isinstance(deco, nypy.nodes.Decorator)
     assert deco.decorators, "please don't strip the no_type_check decorator mypy..."
 
 
@@ -459,12 +459,12 @@ def test_chained_assignment_lvalue_order() -> None:
     assert tree
     assert len(tree.defs) == 1
     assignment_stmt = tree.defs[0]
-    assert isinstance(assignment_stmt, mypy.nodes.AssignmentStmt)
+    assert isinstance(assignment_stmt, nypy.nodes.AssignmentStmt)
     lvalues = assignment_stmt.lvalues
     assert len(lvalues) == 2
     first, second = lvalues
-    assert isinstance(first, mypy.nodes.NameExpr) and first.name == "outer"
-    assert isinstance(second, mypy.nodes.NameExpr) and second.name == "inner"
+    assert isinstance(first, nypy.nodes.NameExpr) and first.name == "outer"
+    assert isinstance(second, nypy.nodes.NameExpr) and second.name == "inner"
 
 
 def test_list_expr_assignment_target() -> None:
@@ -479,10 +479,10 @@ def test_list_expr_assignment_target() -> None:
     tree = result.graph[TEST_MODULE].tree
     assert tree and len(tree.defs) == 2
     for stmt in tree.defs:
-        assert isinstance(stmt, mypy.nodes.AssignmentStmt)
+        assert isinstance(stmt, nypy.nodes.AssignmentStmt)
         lvalues = stmt.lvalues
         assert len(lvalues) == 1
-        assert isinstance(lvalues[0], mypy.nodes.TupleExpr)
+        assert isinstance(lvalues[0], nypy.nodes.TupleExpr)
 
 
 def test_assignment_statements() -> None:
@@ -525,22 +525,22 @@ def test_assignment_statements() -> None:
     tree = result.graph[TEST_MODULE].tree
     assert tree
 
-    import mypy.traverser
+    import nypy.traverser
 
-    class MyVisitor(mypy.traverser.TraverserVisitor):
-        def visit_assignment_stmt(self, stmt: mypy.nodes.AssignmentStmt) -> None:
+    class MyVisitor(nypy.traverser.TraverserVisitor):
+        def visit_assignment_stmt(self, stmt: nypy.nodes.AssignmentStmt) -> None:
             (lval,) = stmt.lvalues
             assert isinstance(
                 lval,
-                mypy.nodes.MemberExpr
-                | mypy.nodes.NameExpr
-                | mypy.nodes.TupleExpr
-                | mypy.nodes.SuperExpr
-                | mypy.nodes.IndexExpr,
+                nypy.nodes.MemberExpr
+                | nypy.nodes.NameExpr
+                | nypy.nodes.TupleExpr
+                | nypy.nodes.SuperExpr
+                | nypy.nodes.IndexExpr,
             )
-            if isinstance(lval, mypy.nodes.MemberExpr) and lval.def_var is not None:
+            if isinstance(lval, nypy.nodes.MemberExpr) and lval.def_var is not None:
                 assert lval.def_var is lval.node
-            if isinstance(stmt.rvalue, mypy.nodes.TempNode) and stmt.rvalue.no_rhs:
+            if isinstance(stmt.rvalue, nypy.nodes.TempNode) and stmt.rvalue.no_rhs:
                 assert stmt.type is not None
                 assert lval.is_new_def
             super().visit_assignment_stmt(stmt)
@@ -633,7 +633,7 @@ def test_special_decorators() -> None:
     tree = result.graph[TEST_MODULE].tree
     assert tree
     class_def = tree.defs[-1]
-    assert isinstance(class_def, mypy.nodes.ClassDef)
+    assert isinstance(class_def, nypy.nodes.ClassDef)
 
 
 def test_variadic_tuple_type() -> None:
@@ -655,13 +655,13 @@ def test_variadic_tuple_type() -> None:
     tree = result.graph[TEST_MODULE].tree
     assert tree
     func = tree.defs[1]
-    assert isinstance(func, mypy.nodes.FuncDef)
-    assert isinstance(func.type, mypy.types.CallableType)
-    assert type(func.type.ret_type) == mypy.types.Instance
+    assert isinstance(func, nypy.nodes.FuncDef)
+    assert isinstance(func.type, nypy.types.CallableType)
+    assert type(func.type.ret_type) == nypy.types.Instance
     func2 = tree.defs[2]
-    assert isinstance(func2, mypy.nodes.FuncDef)
-    assert isinstance(func2.type, mypy.types.CallableType)
-    assert type(func2.type.ret_type) == mypy.types.TupleType
+    assert isinstance(func2, nypy.nodes.FuncDef)
+    assert isinstance(func2.type, nypy.types.CallableType)
+    assert type(func2.type.ret_type) == nypy.types.TupleType
 
 
 def test_tuple_covariance() -> None:
@@ -811,26 +811,26 @@ def test_global_types() -> None:
     tree = result.graph[TEST_MODULE].tree
     assert tree
     silly_func_def = tree.defs[-1]
-    assert isinstance(silly_func_def, mypy.nodes.FuncDef)
+    assert isinstance(silly_func_def, nypy.nodes.FuncDef)
     assert len(silly_func_def.body.body) == 1
     print_stmt = silly_func_def.body.body[0]
-    assert isinstance(print_stmt, mypy.nodes.ExpressionStmt)
+    assert isinstance(print_stmt, nypy.nodes.ExpressionStmt)
     print_call = print_stmt.expr
-    assert isinstance(print_call, mypy.nodes.CallExpr)
+    assert isinstance(print_call, nypy.nodes.CallExpr)
     for arg_name_expr in print_call.args:
-        assert isinstance(arg_name_expr, mypy.nodes.NameExpr)
-        assert arg_name_expr.kind == mypy.nodes.GDEF
+        assert isinstance(arg_name_expr, nypy.nodes.NameExpr)
+        assert arg_name_expr.kind == nypy.nodes.GDEF
         assert not (
             arg_name_expr.is_alias_rvalue
             or arg_name_expr.is_inferred_def
             or arg_name_expr.is_new_def
             or arg_name_expr.is_special_form
         )
-        assert isinstance(arg_name_expr.node, mypy.nodes.Var)
-        if isinstance(arg_name_expr.node.type, mypy.types.LiteralType):
+        assert isinstance(arg_name_expr.node, nypy.nodes.Var)
+        if isinstance(arg_name_expr.node.type, nypy.types.LiteralType):
             inst_type = arg_name_expr.node.type.fallback
         else:
-            assert isinstance(arg_name_expr.node.type, mypy.types.Instance)
+            assert isinstance(arg_name_expr.node.type, nypy.types.Instance)
             inst_type = arg_name_expr.node.type
         assert inst_type.type.fullname in (
             "builtins.str",
@@ -858,11 +858,11 @@ def test_annotated_metadata() -> None:
     tree = result.graph[TEST_MODULE].tree
     assert tree
     ass = tree.defs[-1]
-    assert isinstance(ass, mypy.nodes.AssignmentStmt)
-    assert isinstance(ass.unanalyzed_type, mypy.types.UnboundType)
+    assert isinstance(ass, nypy.nodes.AssignmentStmt)
+    assert isinstance(ass.unanalyzed_type, nypy.types.UnboundType)
     assert len(ass.unanalyzed_type.args) == 2
     _, ann_arg = ass.unanalyzed_type.args
-    assert isinstance(ann_arg, mypy.types.RawExpressionType) and ann_arg.literal_value is None
+    assert isinstance(ann_arg, nypy.types.RawExpressionType) and ann_arg.literal_value is None
 
 
 def test_dataclass_transform_frozen() -> None:
@@ -907,7 +907,7 @@ def test_dataclass_transform_frozen() -> None:
         'error: Property "field" defined in "FrozenStruct" is read-only  [misc]',
     ]
     tree = result.graph[TEST_MODULE].tree
-    assert isinstance(tree, mypy.nodes.MypyFile)
+    assert isinstance(tree, nypy.nodes.MypyFile)
     struct_cls_def = get_class_by_name(tree, "Struct")
     assert struct_cls_def.info.metadata["dataclass"]["frozen"] is False
     frozen_struct_cls_def = get_class_by_name(tree, "FrozenStruct")
@@ -963,7 +963,7 @@ def test_bound_method_types() -> None:
     assert tree
     reveled_types = get_revealed_types(result, tree)
     assert len(reveled_types) == 9
-    assert all(isinstance(t, mypy.types.CallableType) for t in reveled_types)
+    assert all(isinstance(t, nypy.types.CallableType) for t in reveled_types)
 
 
 def test_special_indexing() -> None:

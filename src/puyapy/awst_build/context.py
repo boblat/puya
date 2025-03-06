@@ -5,10 +5,10 @@ from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 
 import attrs
-import mypy.nodes
-import mypy.options
-import mypy.types
 
+import nypy.nodes
+import nypy.options
+import nypy.types
 from puya import log
 from puya.context import try_get_source
 from puya.errors import CodeError, InternalError, log_exceptions
@@ -30,7 +30,7 @@ class ASTConversionContext:
     _contract_fragments: dict[ContractReference, ContractFragmentBase] = attrs.field(factory=dict)
 
     @property
-    def mypy_options(self) -> mypy.options.Options:
+    def mypy_options(self) -> nypy.options.Options:
         return self._parse_result.mypy_options
 
     @property
@@ -74,8 +74,8 @@ class ASTConversionModuleContext(ASTConversionContext):
 
     def node_location(
         self,
-        node: mypy.nodes.Context,
-        module_src: mypy.nodes.TypeInfo | None = None,
+        node: nypy.nodes.Context,
+        module_src: nypy.nodes.TypeInfo | None = None,
     ) -> SourceLocation:
         if not module_src:
             module_path = self.module_path
@@ -114,33 +114,33 @@ class ASTConversionModuleContext(ASTConversionContext):
         return loc
 
     def _maybe_convert_location(
-        self, location: mypy.nodes.Context | SourceLocation
+        self, location: nypy.nodes.Context | SourceLocation
     ) -> SourceLocation:
-        if isinstance(location, mypy.nodes.Context):
+        if isinstance(location, nypy.nodes.Context):
             return self.node_location(location)
         return location
 
-    def error(self, msg: str, location: mypy.nodes.Context | SourceLocation) -> None:
+    def error(self, msg: str, location: nypy.nodes.Context | SourceLocation) -> None:
         logger.error(msg, location=self._maybe_convert_location(location))
 
-    def info(self, msg: str, location: mypy.nodes.Context | SourceLocation) -> None:
+    def info(self, msg: str, location: nypy.nodes.Context | SourceLocation) -> None:
         logger.info(msg, location=self._maybe_convert_location(location))
 
-    def warning(self, msg: str, location: mypy.nodes.Context | SourceLocation) -> None:
+    def warning(self, msg: str, location: nypy.nodes.Context | SourceLocation) -> None:
         logger.warning(msg, location=self._maybe_convert_location(location))
 
     @contextlib.contextmanager
     def log_exceptions(
-        self, fallback_location: mypy.nodes.Context | SourceLocation
+        self, fallback_location: nypy.nodes.Context | SourceLocation
     ) -> Iterator[None]:
         with log_exceptions(self._maybe_convert_location(fallback_location)):
             yield
 
     def type_to_pytype(
         self,
-        mypy_type: mypy.types.Type,
+        mypy_type: nypy.types.Type,
         *,
-        source_location: mypy.nodes.Context | SourceLocation,
+        source_location: nypy.nodes.Context | SourceLocation,
         in_type_args: bool = False,
     ) -> pytypes.PyType:
         return type_to_pytype(
@@ -153,18 +153,18 @@ class ASTConversionModuleContext(ASTConversionContext):
 
 def type_to_pytype(
     registry: Mapping[str, pytypes.PyType],
-    mypy_type: mypy.types.Type,
+    mypy_type: nypy.types.Type,
     *,
     source_location: SourceLocation,
     in_type_args: bool = False,
     in_func_sig: bool = False,
 ) -> pytypes.PyType:
     loc = source_location
-    proper_type_or_alias: mypy.types.ProperType | mypy.types.TypeAliasType
-    if isinstance(mypy_type, mypy.types.TypeAliasType):
+    proper_type_or_alias: nypy.types.ProperType | nypy.types.TypeAliasType
+    if isinstance(mypy_type, nypy.types.TypeAliasType):
         proper_type_or_alias = mypy_type
     else:
-        proper_type_or_alias = mypy.types.get_proper_type(mypy_type)
+        proper_type_or_alias = nypy.types.get_proper_type(mypy_type)
     recurse = functools.partial(
         type_to_pytype,
         registry,
@@ -173,15 +173,15 @@ def type_to_pytype(
         in_func_sig=in_func_sig,
     )
     match proper_type_or_alias:
-        case mypy.types.TypeAliasType(alias=alias, args=args):
+        case nypy.types.TypeAliasType(alias=alias, args=args):
             if alias is None:
                 raise InternalError("mypy type alias type missing alias reference", loc)
             result = registry.get(alias.fullname)
             if result is None:
-                return recurse(mypy.types.get_proper_type(proper_type_or_alias))
+                return recurse(nypy.types.get_proper_type(proper_type_or_alias))
             return _maybe_parameterise_pytype(registry, result, args, loc)
         # this is how variadic tuples are represented in mypy types...
-        case mypy.types.Instance(type=mypy.nodes.TypeInfo(fullname="builtins.tuple"), args=args):
+        case nypy.types.Instance(type=nypy.nodes.TypeInfo(fullname="builtins.tuple"), args=args):
             try:
                 (arg,) = args
             except ValueError:
@@ -191,7 +191,7 @@ def type_to_pytype(
             if not in_func_sig:
                 raise CodeError("variadic tuples are not supported", loc)
             return pytypes.VariadicTupleType(items=recurse(arg))
-        case mypy.types.Instance(args=args) as inst:
+        case nypy.types.Instance(args=args) as inst:
             fullname = inst.type.fullname
             result = registry.get(fullname)
             if result is None:
@@ -201,14 +201,14 @@ def type_to_pytype(
                     msg = f"Unknown type: {fullname}"
                 raise CodeError(msg, loc)
             return _maybe_parameterise_pytype(registry, result, args, loc)
-        case mypy.types.TupleType(items=items, partial_fallback=fallback):
+        case nypy.types.TupleType(items=items, partial_fallback=fallback):
             if not fallback.args:
                 return recurse(fallback)
             generic = registry.get(fallback.type.fullname)
             if generic is None:
                 raise CodeError(f"unknown tuple base type: {fallback.type.fullname}", loc)
             return _maybe_parameterise_pytype(registry, generic, items, loc)
-        case mypy.types.LiteralType(fallback=fallback, value=literal_value) as mypy_literal_type:
+        case nypy.types.LiteralType(fallback=fallback, value=literal_value) as mypy_literal_type:
             if not in_type_args:
                 # this is a bit clumsy, but exists because for some reason, bool types
                 # can be "narrowed" down to a typing.Literal. e.g. in the case of:
@@ -228,7 +228,7 @@ def type_to_pytype(
             else:
                 our_literal_value = literal_value
             return pytypes.TypingLiteralType(value=our_literal_value, source_location=loc)
-        case mypy.types.UnionType(items=items):
+        case nypy.types.UnionType(items=items):
             types = unique(recurse(it) for it in items)
             if not types:
                 return pytypes.NeverType
@@ -236,17 +236,17 @@ def type_to_pytype(
                 return types[0]
             else:
                 return pytypes.UnionType(types, loc)
-        case mypy.types.NoneType() | mypy.types.PartialType(type=None):
+        case nypy.types.NoneType() | nypy.types.PartialType(type=None):
             return pytypes.NoneType
-        case mypy.types.UninhabitedType():
+        case nypy.types.UninhabitedType():
             return pytypes.NeverType
-        case mypy.types.AnyType(type_of_any=type_of_any):
+        case nypy.types.AnyType(type_of_any=type_of_any):
             msg = _type_of_any_to_error_message(type_of_any, loc)
             raise CodeError(msg, loc)
-        case mypy.types.TypeType(item=inner_type):
+        case nypy.types.TypeType(item=inner_type):
             inner_pytype = recurse(inner_type)
             return pytypes.TypeType(inner_pytype)
-        case mypy.types.FunctionLike() as func_like:
+        case nypy.types.FunctionLike() as func_like:
             if func_like.is_type_obj():
                 # note sure if this will always work for overloads, but the only overloaded
                 # constructor we have is arc4.StaticArray, so...
@@ -254,7 +254,7 @@ def type_to_pytype(
                 cls_typ = recurse(ret_type)
                 return pytypes.TypeType(cls_typ)
             else:
-                if not isinstance(func_like, mypy.types.CallableType):  # vs Overloaded
+                if not isinstance(func_like, nypy.types.CallableType):  # vs Overloaded
                     raise CodeError("references to overloaded functions are not supported", loc)
                 ret_pytype = recurse(func_like.ret_type)
                 func_args = []
@@ -289,12 +289,12 @@ def type_to_pytype(
 def _maybe_parameterise_pytype(
     registry: Mapping[str, pytypes.PyType],
     maybe_generic: pytypes.PyType,
-    mypy_type_args: Sequence[mypy.types.Type],
+    mypy_type_args: Sequence[nypy.types.Type],
     loc: SourceLocation,
 ) -> pytypes.PyType:
     if not mypy_type_args:
         return maybe_generic
-    if all(isinstance(t, mypy.types.TypeVarType | mypy.types.UnpackType) for t in mypy_type_args):
+    if all(isinstance(t, nypy.types.TypeVarType | nypy.types.UnpackType) for t in mypy_type_args):
         return maybe_generic
     type_args_resolved = [
         type_to_pytype(registry, mta, source_location=loc, in_type_args=True)
@@ -305,7 +305,7 @@ def _maybe_parameterise_pytype(
 
 
 def _type_of_any_to_error_message(type_of_any: int, source_location: SourceLocation) -> str:
-    from mypy.types import TypeOfAny
+    from nypy.types import TypeOfAny
 
     match type_of_any:
         case TypeOfAny.unannotated:

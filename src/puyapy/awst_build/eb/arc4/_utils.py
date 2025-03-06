@@ -3,8 +3,8 @@ import typing
 from collections.abc import Sequence
 
 import attrs
-import mypy.nodes
 
+import nypy.nodes
 from puya import log
 from puya.awst import nodes as awst_nodes
 from puya.errors import CodeError, InternalError
@@ -198,7 +198,7 @@ def _implicit_arc4_conversion(
         return target_type_builder.call(
             args=conversion_args,
             arg_names=[None] * len(conversion_args),
-            arg_kinds=[mypy.nodes.ARG_POS] * len(conversion_args),
+            arg_kinds=[nypy.nodes.ARG_POS] * len(conversion_args),
             location=instance.source_location,
         )
     encoded = awst_nodes.ARC4Encode(

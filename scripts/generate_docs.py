@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 import subprocess
-import sys
 import typing
 from collections.abc import Callable
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "puyapy" / "_vendor"))
-
-
 import attrs
-import mypy.build
-import mypy.nodes
-from mypy.visitor import NodeVisitor
 
+import nypy.build
+import nypy.nodes
+from nypy.visitor import NodeVisitor
 from puyapy.compile import get_mypy_options
 from puyapy.parse import parse_and_typecheck
 
@@ -37,7 +33,7 @@ def main() -> None:
     run_sphinx()
 
 
-def output_doc_stubs(manager: mypy.build.BuildManager) -> None:
+def output_doc_stubs(manager: nypy.build.BuildManager) -> None:
     # parse and output reformatted __init__.pyi
     stub = DocStub.process_module(manager, "algopy")
     algopy_direct_imports = stub.collected_imports["algopy"]
@@ -91,22 +87,22 @@ def run_sphinx() -> None:
 
 @attrs.define(kw_only=True)
 class ClassBases:
-    klass: mypy.nodes.ClassDef
-    bases: list[mypy.nodes.Expression]
-    protocol_bases: list[tuple[mypy.nodes.MypyFile, mypy.nodes.ClassDef]]
+    klass: nypy.nodes.ClassDef
+    bases: list[nypy.nodes.Expression]
+    protocol_bases: list[tuple[nypy.nodes.MypyFile, nypy.nodes.ClassDef]]
 
 
 @attrs.define
 class SymbolCollector(NodeVisitor[None]):
-    file: mypy.nodes.MypyFile
+    file: nypy.nodes.MypyFile
     read_source: Callable[[str], list[str] | None]
-    all_classes: dict[str, tuple[mypy.nodes.MypyFile, mypy.nodes.ClassDef]]
+    all_classes: dict[str, tuple[nypy.nodes.MypyFile, nypy.nodes.ClassDef]]
     inlined_protocols: dict[str, set[str]]
     symbols: dict[str, str] = attrs.field(factory=dict)
-    last_stmt: mypy.nodes.Statement | None = None
+    last_stmt: nypy.nodes.Statement | None = None
 
     def get_src(
-        self, node: mypy.nodes.Context, *, path: str | None = None, entire_lines: bool = True
+        self, node: nypy.nodes.Context, *, path: str | None = None, entire_lines: bool = True
     ) -> str:
         columns: tuple[int, int] | None = None
         if node.end_column and not entire_lines:
@@ -129,17 +125,17 @@ class SymbolCollector(NodeVisitor[None]):
             lines[0] = lines[0][columns[0] :]
         return "\n".join(lines)
 
-    def visit_mypy_file(self, o: mypy.nodes.MypyFile) -> None:
+    def visit_mypy_file(self, o: nypy.nodes.MypyFile) -> None:
         for stmt in o.defs:
             stmt.accept(self)
             self.last_stmt = stmt
 
-    def _get_bases(self, klass: mypy.nodes.ClassDef) -> ClassBases:
-        bases = list[mypy.nodes.Expression]()
-        inline = list[tuple[mypy.nodes.MypyFile, mypy.nodes.ClassDef]]()
+    def _get_bases(self, klass: nypy.nodes.ClassDef) -> ClassBases:
+        bases = list[nypy.nodes.Expression]()
+        inline = list[tuple[nypy.nodes.MypyFile, nypy.nodes.ClassDef]]()
         for base in klass.base_type_exprs:
             if (
-                isinstance(base, mypy.nodes.NameExpr)
+                isinstance(base, nypy.nodes.NameExpr)
                 and _should_inline_module(base.fullname)
                 and self._is_protocol(base.fullname)
             ):
@@ -162,7 +158,7 @@ class SymbolCollector(NodeVisitor[None]):
             )
         return "\n".join(src)
 
-    def visit_class_def(self, o: mypy.nodes.ClassDef) -> None:
+    def visit_class_def(self, o: nypy.nodes.ClassDef) -> None:
         self.all_classes[o.fullname] = self.file, o
         class_bases = self._get_bases(o)
         if class_bases.protocol_bases:
@@ -170,10 +166,10 @@ class SymbolCollector(NodeVisitor[None]):
         else:
             self.symbols[o.name] = self.get_src(o)
 
-    def visit_func_def(self, o: mypy.nodes.FuncDef) -> None:
+    def visit_func_def(self, o: nypy.nodes.FuncDef) -> None:
         self.symbols[o.name] = self.get_src(o)
 
-    def visit_overloaded_func_def(self, o: mypy.nodes.OverloadedFuncDef) -> None:
+    def visit_overloaded_func_def(self, o: nypy.nodes.OverloadedFuncDef) -> None:
         line = o.line
         end_line = o.end_line or o.line
         for item in o.items:
@@ -189,26 +185,26 @@ class SymbolCollector(NodeVisitor[None]):
 
         self.symbols[o.name] = src
 
-    def visit_assignment_stmt(self, o: mypy.nodes.AssignmentStmt) -> None:
+    def visit_assignment_stmt(self, o: nypy.nodes.AssignmentStmt) -> None:
         try:
             (lvalue,) = o.lvalues
         except ValueError as ex:
             raise ValueError(f"Multi assignments are not supported: {o}") from ex
-        if not isinstance(lvalue, mypy.nodes.NameExpr):
+        if not isinstance(lvalue, nypy.nodes.NameExpr):
             raise TypeError(f"Multi assignments are not supported: {lvalue}")
         # find actual rvalue src location by taking the entire statement and subtracting the lvalue
-        loc = mypy.nodes.Context()
+        loc = nypy.nodes.Context()
         loc.set_line(o)
         if lvalue.end_column:
             loc.column = lvalue.end_column
         self.symbols[lvalue.name] = self.get_src(loc)
 
-    def visit_expression_stmt(self, o: mypy.nodes.ExpressionStmt) -> None:
-        if isinstance(o.expr, mypy.nodes.StrExpr) and isinstance(
-            self.last_stmt, mypy.nodes.AssignmentStmt
+    def visit_expression_stmt(self, o: nypy.nodes.ExpressionStmt) -> None:
+        if isinstance(o.expr, nypy.nodes.StrExpr) and isinstance(
+            self.last_stmt, nypy.nodes.AssignmentStmt
         ):
             (lvalue,) = self.last_stmt.lvalues
-            if isinstance(lvalue, mypy.nodes.NameExpr):
+            if isinstance(lvalue, nypy.nodes.NameExpr):
                 self.symbols[lvalue.name] += "\n" + self.get_src(o.expr)
 
     def _is_protocol(self, fullname: str) -> bool:
@@ -216,17 +212,17 @@ class SymbolCollector(NodeVisitor[None]):
             klass = self.all_classes[fullname]
         except KeyError:
             return False
-        info: mypy.nodes.TypeInfo = klass[1].info
+        info: nypy.nodes.TypeInfo = klass[1].info
         return info.is_protocol
 
 
-def _get_documented_overload(o: mypy.nodes.OverloadedFuncDef) -> mypy.nodes.FuncDef | None:
-    best_overload: mypy.nodes.FuncDef | None = None
+def _get_documented_overload(o: nypy.nodes.OverloadedFuncDef) -> nypy.nodes.FuncDef | None:
+    best_overload: nypy.nodes.FuncDef | None = None
     for overload in o.items:
         match overload:
-            case mypy.nodes.Decorator(func=func_def):
+            case nypy.nodes.Decorator(func=func_def):
                 pass
-            case mypy.nodes.FuncDef() as func_def:
+            case nypy.nodes.FuncDef() as func_def:
                 pass
             case _:
                 raise Exception("Only function overloads supported")
@@ -252,16 +248,16 @@ class ImportCollector(NodeVisitor[None]):
             imports = self.collected_imports[module_id] = ModuleImports()
         return imports
 
-    def visit_mypy_file(self, o: mypy.nodes.MypyFile) -> None:
+    def visit_mypy_file(self, o: nypy.nodes.MypyFile) -> None:
         for stmt in o.defs:
             stmt.accept(self)
 
-    def visit_import_from(self, o: mypy.nodes.ImportFrom) -> None:
+    def visit_import_from(self, o: nypy.nodes.ImportFrom) -> None:
         imports = self.get_imports(o.id)
         for name, name_as in o.names:
             imports.from_imports[name] = name_as
 
-    def visit_import(self, o: mypy.nodes.Import) -> None:
+    def visit_import(self, o: nypy.nodes.Import) -> None:
         for name, name_as in o.ids:
             if name != (name_as or name):
                 raise Exception("Aliasing symbols in stubs is not supported")
@@ -273,10 +269,10 @@ class ImportCollector(NodeVisitor[None]):
 @attrs.define
 class DocStub(NodeVisitor[None]):
     read_source: Callable[[str], list[str] | None]
-    file: mypy.nodes.MypyFile
-    modules: dict[str, mypy.nodes.MypyFile]
+    file: nypy.nodes.MypyFile
+    modules: dict[str, nypy.nodes.MypyFile]
     parsed_modules: dict[str, SymbolCollector] = attrs.field(factory=dict)
-    all_classes: dict[str, tuple[mypy.nodes.MypyFile, mypy.nodes.ClassDef]] = attrs.field(
+    all_classes: dict[str, tuple[nypy.nodes.MypyFile, nypy.nodes.ClassDef]] = attrs.field(
         factory=dict
     )
     collected_imports: dict[str, ModuleImports] = attrs.field(factory=dict)
@@ -284,11 +280,11 @@ class DocStub(NodeVisitor[None]):
     collected_symbols: dict[str, str] = attrs.field(factory=dict)
 
     @classmethod
-    def process_module(cls, manager: mypy.build.BuildManager, module_id: str) -> typing.Self:
+    def process_module(cls, manager: nypy.build.BuildManager, module_id: str) -> typing.Self:
         read_source = manager.errors.read_source
         assert read_source
         modules = manager.modules
-        module: mypy.nodes.MypyFile = modules[module_id]
+        module: nypy.nodes.MypyFile = modules[module_id]
         stub = cls(read_source=read_source, file=module, modules=modules)
         module.accept(stub)
         stub._remove_inlined_symbols()  # noqa: SLF001
@@ -309,7 +305,7 @@ class DocStub(NodeVisitor[None]):
             self._collect_imports(file)
             return collector
 
-    def _collect_imports(self, o: mypy.nodes.Node) -> None:
+    def _collect_imports(self, o: nypy.nodes.Node) -> None:
         o.accept(ImportCollector(self.collected_imports))
         self._remove_inlined_symbols()
 
@@ -329,12 +325,12 @@ class DocStub(NodeVisitor[None]):
                     else:
                         print(f"Symbol/import collision: from {module} import {name} as {name_as}")
 
-    def visit_mypy_file(self, o: mypy.nodes.MypyFile) -> None:
+    def visit_mypy_file(self, o: nypy.nodes.MypyFile) -> None:
         for stmt in o.defs:
             stmt.accept(self)
         self._add_all_symbols(o.fullname)
 
-    def visit_import_from(self, o: mypy.nodes.ImportFrom) -> None:
+    def visit_import_from(self, o: nypy.nodes.ImportFrom) -> None:
         if not _should_inline_module(o.id):
             self._collect_imports(o)
             return
@@ -349,7 +345,7 @@ class DocStub(NodeVisitor[None]):
                 raise Exception("Aliasing symbols in stubs is not supported")
             self.add_symbol(module, name)
 
-    def visit_import_all(self, o: mypy.nodes.ImportAll) -> None:
+    def visit_import_all(self, o: nypy.nodes.ImportAll) -> None:
         if _should_inline_module(o.id):
             self._add_all_symbols(o.id)
         else:
@@ -360,7 +356,7 @@ class DocStub(NodeVisitor[None]):
         for sym in module.symbols:
             self.add_symbol(module, sym)
 
-    def visit_import(self, o: mypy.nodes.Import) -> None:
+    def visit_import(self, o: nypy.nodes.Import) -> None:
         self._collect_imports(o)
 
     def add_symbol(self, module: SymbolCollector, name: str) -> None:

@@ -2,9 +2,9 @@ import abc
 import typing
 from collections.abc import Sequence
 
-import mypy.nodes
 import typing_extensions
 
+import nypy.nodes
 from puya.awst.nodes import Expression, ReinterpretCast
 from puya.parse import SourceLocation
 from puyapy.awst_build import pytypes
@@ -40,7 +40,7 @@ class _FromBytes(FunctionBuilder):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[mypy.nodes.ArgKind],
+        arg_kinds: list[nypy.nodes.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:

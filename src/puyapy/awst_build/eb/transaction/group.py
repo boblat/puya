@@ -1,8 +1,7 @@
 import typing
 from collections.abc import Sequence
 
-import mypy.nodes
-
+import nypy.nodes
 from puya import algo_constants, log
 from puya.awst.nodes import Expression, GroupTransactionReference, IntrinsicCall, UInt64Constant
 from puya.awst.txn_fields import TxnField
@@ -51,7 +50,7 @@ class GroupTransactionTypeBuilder(TypeBuilder[pytypes.GroupTransactionType]):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[mypy.nodes.ArgKind],
+        arg_kinds: list[nypy.nodes.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:

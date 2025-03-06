@@ -6,16 +6,16 @@ from collections.abc import Callable, Mapping, Sequence
 from importlib import metadata
 from pathlib import Path
 
-import mypy.build
-import mypy.errors
-import mypy.find_sources
-import mypy.fscache
-import mypy.modulefinder
-import mypy.nodes
-import mypy.options
-import mypy.util
 from packaging import version
 
+import nypy.build
+import nypy.errors
+import nypy.find_sources
+import nypy.fscache
+import nypy.modulefinder
+import nypy.nodes
+import nypy.options
+import nypy.util
 from puya import log
 from puya.arc56 import create_arc56_json
 from puya.awst.nodes import AWST
@@ -49,7 +49,7 @@ def compile_to_teal(puyapy_options: PuyaPyOptions) -> None:
             log_ctx.sources_by_path = parse_result.sources_by_path
             log_ctx.exit_if_errors()
             awst, compilation_targets = transform_ast(parse_result)
-        except mypy.errors.CompileError:
+        except nypy.errors.CompileError:
             # the placement of this catch is probably overly conservative,
             # but in parse_with_mypy there is a piece copied from mypyc, around setting
             # the location during mypy callbacks in case errors are produced.
@@ -117,8 +117,8 @@ def parse_with_mypy(paths: Sequence[Path]) -> ParseResult:
     )
 
 
-def get_mypy_options() -> mypy.options.Options:
-    mypy_opts = mypy.options.Options()
+def get_mypy_options() -> nypy.options.Options:
+    mypy_opts = nypy.options.Options()
 
     # improve mypy parsing performance by using a cut-down typeshed
     mypy_opts.custom_typeshed_dir = str(TYPESHED_PATH)

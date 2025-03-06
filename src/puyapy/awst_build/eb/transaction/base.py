@@ -2,8 +2,7 @@ import abc
 import typing
 from collections.abc import Sequence
 
-import mypy.nodes
-
+import nypy.nodes
 from puya.awst.nodes import Expression
 from puya.awst.txn_fields import TxnField
 from puya.errors import CodeError
@@ -66,7 +65,7 @@ class _ArrayItem(FunctionBuilder):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[mypy.nodes.ArgKind],
+        arg_kinds: list[nypy.nodes.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:

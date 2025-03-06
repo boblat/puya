@@ -2,10 +2,10 @@ import typing
 from collections.abc import Iterator, Mapping, Sequence
 
 import attrs
-import mypy.nodes
-import mypy.types
-import mypy.visitor
 
+import nypy.nodes
+import nypy.types
+import nypy.visitor
 from puya import log
 from puya.errors import InternalError
 from puya.parse import SourceLocation
@@ -82,7 +82,7 @@ class _ARC4ClientFragment(ContractFragmentBase):
 
 class ARC4ClientASTVisitor(BaseMyPyStatementVisitor[ARC4ABIMethodData | None]):
     @classmethod
-    def visit(cls, context: ASTConversionModuleContext, class_def: mypy.nodes.ClassDef) -> None:
+    def visit(cls, context: ASTConversionModuleContext, class_def: nypy.nodes.ClassDef) -> None:
         visitor = ARC4ClientASTVisitor(context)
         cref = ContractReference(class_def.info.fullname)
         fragment = _ARC4ClientFragment(id=cref)
@@ -93,13 +93,13 @@ class ARC4ClientASTVisitor(BaseMyPyStatementVisitor[ARC4ABIMethodData | None]):
                     fragment.add_method(abi_method_data, stmt_loc)
         context.add_contract_fragment(fragment)
 
-    def empty_statement(self, _stmt: mypy.nodes.Statement) -> None:
+    def empty_statement(self, _stmt: nypy.nodes.Statement) -> None:
         return None
 
     def visit_function(
         self,
-        func_def: mypy.nodes.FuncDef,
-        decorator: mypy.nodes.Decorator | None,
+        func_def: nypy.nodes.FuncDef,
+        decorator: nypy.nodes.Decorator | None,
     ) -> ARC4ABIMethodData | None:
         func_loc = self._location(func_def)
         if decorator is not None:
@@ -115,58 +115,58 @@ class ARC4ClientASTVisitor(BaseMyPyStatementVisitor[ARC4ABIMethodData | None]):
         logger.error(f"expected an {constants.ABIMETHOD_DECORATOR} decorator", location=func_loc)
         return None
 
-    def visit_block(self, o: mypy.nodes.Block) -> None:
+    def visit_block(self, o: nypy.nodes.Block) -> None:
         raise InternalError("shouldn't get here", self._location(o))
 
-    def visit_return_stmt(self, stmt: mypy.nodes.ReturnStmt) -> None:
+    def visit_return_stmt(self, stmt: nypy.nodes.ReturnStmt) -> None:
         self._error("illegal Python syntax, return in class body", location=stmt)
 
-    def visit_class_def(self, cdef: mypy.nodes.ClassDef) -> None:
+    def visit_class_def(self, cdef: nypy.nodes.ClassDef) -> None:
         self._error("nested classes are not supported", location=cdef)
 
-    def _unsupported_stmt(self, kind: str, stmt: mypy.nodes.Statement) -> None:
+    def _unsupported_stmt(self, kind: str, stmt: nypy.nodes.Statement) -> None:
         self._error(
             f"{kind} statements are not supported in the class body of an ARC4Client",
             location=stmt,
         )
 
-    def visit_assignment_stmt(self, stmt: mypy.nodes.AssignmentStmt) -> None:
+    def visit_assignment_stmt(self, stmt: nypy.nodes.AssignmentStmt) -> None:
         self._unsupported_stmt("assignment", stmt)
 
-    def visit_operator_assignment_stmt(self, stmt: mypy.nodes.OperatorAssignmentStmt) -> None:
+    def visit_operator_assignment_stmt(self, stmt: nypy.nodes.OperatorAssignmentStmt) -> None:
         self._unsupported_stmt("operator assignment", stmt)
 
-    def visit_expression_stmt(self, stmt: mypy.nodes.ExpressionStmt) -> None:
-        if isinstance(stmt.expr, mypy.nodes.StrExpr):
+    def visit_expression_stmt(self, stmt: nypy.nodes.ExpressionStmt) -> None:
+        if isinstance(stmt.expr, nypy.nodes.StrExpr):
             # ignore class docstring, already extracted
             # TODO: should we capture field "docstrings"?
             pass
         else:
             self._unsupported_stmt("expression statement", stmt)
 
-    def visit_if_stmt(self, stmt: mypy.nodes.IfStmt) -> None:
+    def visit_if_stmt(self, stmt: nypy.nodes.IfStmt) -> None:
         self._unsupported_stmt("if", stmt)
 
-    def visit_while_stmt(self, stmt: mypy.nodes.WhileStmt) -> None:
+    def visit_while_stmt(self, stmt: nypy.nodes.WhileStmt) -> None:
         self._unsupported_stmt("while", stmt)
 
-    def visit_for_stmt(self, stmt: mypy.nodes.ForStmt) -> None:
+    def visit_for_stmt(self, stmt: nypy.nodes.ForStmt) -> None:
         self._unsupported_stmt("for", stmt)
 
-    def visit_break_stmt(self, stmt: mypy.nodes.BreakStmt) -> None:
+    def visit_break_stmt(self, stmt: nypy.nodes.BreakStmt) -> None:
         self._unsupported_stmt("break", stmt)
 
-    def visit_continue_stmt(self, stmt: mypy.nodes.ContinueStmt) -> None:
+    def visit_continue_stmt(self, stmt: nypy.nodes.ContinueStmt) -> None:
         self._unsupported_stmt("continue", stmt)
 
-    def visit_assert_stmt(self, stmt: mypy.nodes.AssertStmt) -> None:
+    def visit_assert_stmt(self, stmt: nypy.nodes.AssertStmt) -> None:
         self._unsupported_stmt("assert", stmt)
 
-    def visit_del_stmt(self, stmt: mypy.nodes.DelStmt) -> None:
+    def visit_del_stmt(self, stmt: nypy.nodes.DelStmt) -> None:
         self._unsupported_stmt("del", stmt)
 
-    def visit_match_stmt(self, stmt: mypy.nodes.MatchStmt) -> None:
+    def visit_match_stmt(self, stmt: nypy.nodes.MatchStmt) -> None:
         self._unsupported_stmt("match", stmt)
 
-    def visit_type_alias_stmt(self, stmt: mypy.nodes.TypeAliasStmt) -> None:
+    def visit_type_alias_stmt(self, stmt: nypy.nodes.TypeAliasStmt) -> None:
         self._unsupported_stmt("type", stmt)

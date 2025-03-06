@@ -3,10 +3,10 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import attrs
-import mypy.nodes
-import mypy.types
 import pytest
 
+import nypy.nodes
+import nypy.types
 from puya.awst.txn_fields import TxnField
 from puya.parse import SourceLocation
 from puyapy.awst_build import pytypes
@@ -35,7 +35,7 @@ class FieldType:
     field_type: pytypes.PyType
 
 
-def _get_type_infos(type_names: Iterable[str]) -> Iterable[mypy.nodes.TypeInfo]:
+def _get_type_infos(type_names: Iterable[str]) -> Iterable[nypy.nodes.TypeInfo]:
     awst_cache = get_awst_cache(EXAMPLES_DIR)
 
     for type_name in type_names:
@@ -44,7 +44,7 @@ def _get_type_infos(type_names: Iterable[str]) -> Iterable[mypy.nodes.TypeInfo]:
 
         symbol = module.names[symbol_name]
         node = symbol.node
-        assert isinstance(node, mypy.nodes.TypeInfo), f"{type_name} not found in {module}"
+        assert isinstance(node, nypy.nodes.TypeInfo), f"{type_name} not found in {module}"
         yield node
 
 
@@ -81,7 +81,7 @@ def test_inner_transaction_field_setters() -> None:
         init_args: set[str] | None = None
         for member in ("__init__", "set"):
             func_def = type_info.names[member].node
-            assert isinstance(func_def, mypy.nodes.FuncDef)
+            assert isinstance(func_def, nypy.nodes.FuncDef)
             arg_names = {a for a in func_def.arg_names if a is not None}
             arg_names.remove("self")
             unknown = sorted(arg_names - PYTHON_ITXN_ARGUMENTS.keys())
@@ -136,7 +136,7 @@ def test_txn_fields(builtins_registry: Mapping[str, pytypes.PyType]) -> None:
     ):
         for member in ("__init__", "set"):
             func_def = type_info.names[member].node
-            assert isinstance(func_def, mypy.nodes.FuncDef)
+            assert isinstance(func_def, nypy.nodes.FuncDef)
             assert func_def.type is not None
             func_type = type_to_pytype(
                 builtins_registry, func_def.type, source_location=_FAKE_SOURCE_LOCATION
@@ -208,10 +208,10 @@ def _set_difference(expected: set[str], actual: list[str]) -> list[str]:
 
 
 def _member_to_field_type(
-    builtins_registry: Mapping[str, pytypes.PyType], typ: mypy.types.Type
+    builtins_registry: Mapping[str, pytypes.PyType], typ: nypy.types.Type
 ) -> FieldType:
     is_array = False
-    if isinstance(typ, mypy.types.CallableType):
+    if isinstance(typ, nypy.types.CallableType):
         is_array = len(typ.arg_names) > 1
         typ = typ.ret_type
 

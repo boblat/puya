@@ -1,9 +1,9 @@
 import typing
 
-import mypy.nodes
-import mypy.visitor
 from immutabledict import immutabledict
 
+import nypy.nodes
+import nypy.visitor
 from puya import log
 from puya.avm import OnCompletionAction
 from puya.awst.nodes import (
@@ -29,8 +29,8 @@ logger = log.get_logger(__name__)
 
 def get_arc4_baremethod_data(
     context: ASTConversionModuleContext,
-    decorator: mypy.nodes.Expression,
-    func_def: mypy.nodes.FuncDef,
+    decorator: nypy.nodes.Expression,
+    func_def: nypy.nodes.FuncDef,
 ) -> ARC4BareMethodData:
     dec_loc = context.node_location(decorator, func_def.info)
     pytype, func_types = _get_func_types(context, func_def, dec_loc)
@@ -68,8 +68,8 @@ _NAME_OVERRIDE = "name"
 
 def get_arc4_abimethod_data(
     context: ASTConversionModuleContext,
-    decorator: mypy.nodes.Expression,
-    func_def: mypy.nodes.FuncDef,
+    decorator: nypy.nodes.Expression,
+    func_def: nypy.nodes.FuncDef,
 ) -> ARC4ABIMethodData:
     dec_loc = context.node_location(decorator, func_def.info)
     pytype, func_types = _get_func_types(context, func_def, dec_loc)
@@ -139,7 +139,7 @@ def get_arc4_abimethod_data(
 
 
 def _get_func_types(
-    context: ASTConversionModuleContext, func_def: mypy.nodes.FuncDef, location: SourceLocation
+    context: ASTConversionModuleContext, func_def: nypy.nodes.FuncDef, location: SourceLocation
 ) -> tuple[pytypes.FuncType, dict[str, pytypes.PyType]]:
     if func_def.type is None:
         raise CodeError("typing error", location)
@@ -171,8 +171,8 @@ def _get_func_types(
 
 
 def _extract_decorator_named_args(
-    context: ASTConversionModuleContext, decorator: mypy.nodes.Expression, location: SourceLocation
-) -> dict[str, mypy.nodes.Expression]:
+    context: ASTConversionModuleContext, decorator: nypy.nodes.Expression, location: SourceLocation
+) -> dict[str, nypy.nodes.Expression]:
     result = {}
     for name, value in extract_decorator_args(decorator, location):
         if name is None:
@@ -185,13 +185,13 @@ def _extract_decorator_named_args(
 
 
 def _parse_decorator_arg(
-    context: ASTConversionModuleContext, name: str, value: mypy.nodes.Expression
+    context: ASTConversionModuleContext, name: str, value: nypy.nodes.Expression
 ) -> object:
     visitor = _ARC4DecoratorArgEvaluator(context, name)
     return value.accept(visitor)
 
 
-class _ARC4DecoratorArgEvaluator(mypy.visitor.NodeVisitor[object]):
+class _ARC4DecoratorArgEvaluator(nypy.visitor.NodeVisitor[object]):
     def __init__(self, context: ASTConversionModuleContext, arg_name: str):
         self.context = context
         self.arg_name = arg_name
@@ -202,10 +202,10 @@ class _ARC4DecoratorArgEvaluator(mypy.visitor.NodeVisitor[object]):
             return self._not_supported
         return attr
 
-    def _not_supported(self, o: mypy.nodes.Context) -> typing.Never:
+    def _not_supported(self, o: nypy.nodes.Context) -> typing.Never:
         raise CodeError("unexpected argument type", self.context.node_location(o))
 
-    def _resolve_constant_reference(self, expr: mypy.nodes.RefExpr) -> object:
+    def _resolve_constant_reference(self, expr: nypy.nodes.RefExpr) -> object:
         try:
             return self.context.constants[expr.fullname]
         except KeyError:
@@ -214,28 +214,28 @@ class _ARC4DecoratorArgEvaluator(mypy.visitor.NodeVisitor[object]):
             ) from None
 
     @typing.override
-    def visit_call_expr(self, o: mypy.nodes.CallExpr) -> Expression:
+    def visit_call_expr(self, o: nypy.nodes.CallExpr) -> Expression:
         return _parse_expression(self.context, o)
 
     @typing.override
-    def visit_str_expr(self, o: mypy.nodes.StrExpr) -> str:
+    def visit_str_expr(self, o: nypy.nodes.StrExpr) -> str:
         return o.value
 
     @typing.override
-    def visit_name_expr(self, o: mypy.nodes.NameExpr) -> object:
+    def visit_name_expr(self, o: nypy.nodes.NameExpr) -> object:
         if self.arg_name == _READONLY:
             if o.fullname == "builtins.True":
                 return True
             if o.fullname == "builtins.False":
                 return False
         elif self.arg_name == _CLIENT_DEFAULTS:
-            if isinstance(o.node, mypy.nodes.Decorator):
+            if isinstance(o.node, nypy.nodes.Decorator):
                 return o.name  # assume abimethod
         return self._resolve_constant_reference(o)
 
     @typing.override
-    def visit_member_expr(self, o: mypy.nodes.MemberExpr) -> object:
-        if self.arg_name == _ALLOWED_ACTIONS and isinstance(o.expr, mypy.nodes.RefExpr):
+    def visit_member_expr(self, o: nypy.nodes.MemberExpr) -> object:
+        if self.arg_name == _ALLOWED_ACTIONS and isinstance(o.expr, nypy.nodes.RefExpr):
             unaliased_base_fullname = get_unaliased_fullname(o.expr)
             if unaliased_base_fullname == pytypes.OnCompleteActionType.name:
                 try:
@@ -251,7 +251,7 @@ class _ARC4DecoratorArgEvaluator(mypy.visitor.NodeVisitor[object]):
         return self._resolve_constant_reference(o)
 
     @typing.override
-    def visit_unary_expr(self, o: mypy.nodes.UnaryExpr) -> object:
+    def visit_unary_expr(self, o: nypy.nodes.UnaryExpr) -> object:
         if self.arg_name == _READONLY:
             operand = o.expr.accept(self)
             if o.op == "not":
@@ -261,13 +261,13 @@ class _ARC4DecoratorArgEvaluator(mypy.visitor.NodeVisitor[object]):
         self._not_supported(o)
 
     @typing.override
-    def visit_list_expr(self, o: mypy.nodes.ListExpr) -> object:
+    def visit_list_expr(self, o: nypy.nodes.ListExpr) -> object:
         if self.arg_name == _ALLOWED_ACTIONS:
             return [item.accept(self) for item in o.items]
         self._not_supported(o)
 
     @typing.override
-    def visit_tuple_expr(self, o: mypy.nodes.TupleExpr) -> object:
+    def visit_tuple_expr(self, o: nypy.nodes.TupleExpr) -> object:
         if self.arg_name == _ALLOWED_ACTIONS:
             return tuple(item.accept(self) for item in o.items)
         elif self.arg_name == _CLIENT_DEFAULTS:
@@ -275,12 +275,12 @@ class _ARC4DecoratorArgEvaluator(mypy.visitor.NodeVisitor[object]):
         self._not_supported(o)
 
     @typing.override
-    def visit_dict_expr(self, o: mypy.nodes.DictExpr) -> dict[object, object]:
+    def visit_dict_expr(self, o: nypy.nodes.DictExpr) -> dict[object, object]:
         return {key.accept(self) if key else None: value.accept(self) for key, value in o.items}
 
 
 def _parse_expression(
-    context: ASTConversionModuleContext, node: mypy.nodes.Expression
+    context: ASTConversionModuleContext, node: nypy.nodes.Expression
 ) -> Expression:
     converter = _ConstantExpressionASTConverter(context)
     node_builder = node.accept(converter)
@@ -298,11 +298,11 @@ class _ConstantExpressionASTConverter(ExpressionASTConverter):
         raise InternalError("self variable outside of method", expr_loc)
 
     @typing.override
-    def visit_super_expr(self, o: mypy.nodes.SuperExpr) -> typing.Never:
+    def visit_super_expr(self, o: nypy.nodes.SuperExpr) -> typing.Never:
         raise CodeError("super expressions not supported in decorators", self._location(o))
 
     @typing.override
-    def visit_assignment_expr(self, o: mypy.nodes.AssignmentExpr) -> typing.Never:
+    def visit_assignment_expr(self, o: nypy.nodes.AssignmentExpr) -> typing.Never:
         raise CodeError("assignment expressions not supported in decorators", self._location(o))
 
 

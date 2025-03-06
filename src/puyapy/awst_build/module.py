@@ -2,10 +2,10 @@ import typing
 from collections.abc import Callable, Set
 
 import attrs
-import mypy.nodes
-import mypy.types
-import mypy.visitor
 
+import nypy.nodes
+import nypy.types
+import nypy.visitor
 from puya import log
 from puya.algo_constants import MAX_SCRATCH_SLOT_NUMBER
 from puya.awst.nodes import AWST, LogicSignature, RootNode, StateTotals
@@ -48,7 +48,7 @@ class _LogicSigDecoratorInfo:
 
 
 _BUILTIN_INHERITABLE: typing.Final = frozenset(
-    ("builtins.object", "abc.ABC", *mypy.types.PROTOCOL_NAMES)
+    ("builtins.object", "abc.ABC", *nypy.types.PROTOCOL_NAMES)
 )
 
 
@@ -58,10 +58,10 @@ class ModuleASTConverter(
     """This does basic validation, and traversal of valid module scope elements, collecting
     and folding constants."""
 
-    def __init__(self, context: ASTConversionModuleContext, module: mypy.nodes.MypyFile):
+    def __init__(self, context: ASTConversionModuleContext, module: nypy.nodes.MypyFile):
         super().__init__(context)
         self.module_name: typing.Final = module.fullname
-        self._pre_parse_result = list[tuple[mypy.nodes.Context, StatementResult]]()
+        self._pre_parse_result = list[tuple[nypy.nodes.Context, StatementResult]]()
         for node in module.defs:
             with self.context.log_exceptions(fallback_location=node):
                 items = node.accept(self)
@@ -79,14 +79,14 @@ class ModuleASTConverter(
 
     # Supported Statements
 
-    def empty_statement(self, _stmt: mypy.nodes.Statement) -> StatementResult:
+    def empty_statement(self, _stmt: nypy.nodes.Statement) -> StatementResult:
         return []
 
     def visit_function(
-        self, func_def: mypy.nodes.FuncDef, decorator: mypy.nodes.Decorator | None
+        self, func_def: nypy.nodes.FuncDef, decorator: nypy.nodes.Decorator | None
     ) -> StatementResult:
         self._precondition(
-            func_def.abstract_status == mypy.nodes.NOT_ABSTRACT,
+            func_def.abstract_status == nypy.nodes.NOT_ABSTRACT,
             "module level functions should not be classified as abstract by mypy",
             decorator or func_def,
         )
@@ -135,15 +135,15 @@ class ModuleASTConverter(
         ]
 
     def _process_logic_sig_decorator(
-        self, decorator: mypy.nodes.Expression
+        self, decorator: nypy.nodes.Expression
     ) -> _LogicSigDecoratorInfo:
         name_override = None
         avm_version = None
         scratch_slot_reservations = set[int]()
         match decorator:
-            case mypy.nodes.NameExpr():
+            case nypy.nodes.NameExpr():
                 pass
-            case mypy.nodes.CallExpr(arg_names=arg_names, args=args):
+            case nypy.nodes.CallExpr(arg_names=arg_names, args=args):
                 for arg_name, arg in zip(arg_names, args, strict=True):
                     match arg_name:
                         case "name":
@@ -159,7 +159,7 @@ class ModuleASTConverter(
                             else:
                                 self.context.error("expected an int", arg)
                         case "scratch_slots":
-                            if isinstance(arg, mypy.nodes.TupleExpr | mypy.nodes.ListExpr):
+                            if isinstance(arg, nypy.nodes.TupleExpr | nypy.nodes.ListExpr):
                                 slot_items = arg.items
                             else:
                                 slot_items = [arg]
@@ -187,15 +187,15 @@ class ModuleASTConverter(
             scratch_slots=scratch_slot_reservations,
         )
 
-    def visit_class_def(self, cdef: mypy.nodes.ClassDef) -> StatementResult:
+    def visit_class_def(self, cdef: nypy.nodes.ClassDef) -> StatementResult:
         self.check_fatal_decorators(cdef.decorators)
         cdef_loc = self._location(cdef)
         match cdef.analyzed:
             case None:
                 pass
-            case mypy.nodes.TypedDictExpr():
+            case nypy.nodes.TypedDictExpr():
                 self._unsupported(cdef, "TypedDict classes are not supported")
-            case mypy.nodes.NamedTupleExpr():
+            case nypy.nodes.NamedTupleExpr():
                 return _process_named_tuple(self.context, cdef)
             case unrecognised_analysis_expression:
                 self.context.warning(
@@ -212,7 +212,7 @@ class ModuleASTConverter(
                 ),
                 location=decorator,
             )
-        info: mypy.nodes.TypeInfo = cdef.info
+        info: nypy.nodes.TypeInfo = cdef.info
         if info.bad_mro:
             self._error("Bad MRO", location=cdef_loc)
             return []
@@ -293,15 +293,15 @@ class ModuleASTConverter(
         return []
 
     def visit_operator_assignment_stmt(
-        self, stmt: mypy.nodes.OperatorAssignmentStmt
+        self, stmt: nypy.nodes.OperatorAssignmentStmt
     ) -> StatementResult:
         match stmt.lvalue:
-            case mypy.nodes.NameExpr(name="__all__"):
+            case nypy.nodes.NameExpr(name="__all__"):
                 return self.empty_statement(stmt)
             case _:
                 self._unsupported(stmt)
 
-    def visit_if_stmt(self, stmt: mypy.nodes.IfStmt) -> StatementResult:
+    def visit_if_stmt(self, stmt: nypy.nodes.IfStmt) -> StatementResult:
         for expr, block in zip(stmt.expr, stmt.body, strict=True):
             if self._evaluate_compile_time_constant_condition(expr):
                 return block.accept(self)
@@ -312,7 +312,7 @@ class ModuleASTConverter(
         else:
             return []
 
-    def visit_assignment_stmt(self, stmt: mypy.nodes.AssignmentStmt) -> StatementResult:
+    def visit_assignment_stmt(self, stmt: nypy.nodes.AssignmentStmt) -> StatementResult:
         stmt_loc = self._location(stmt)
         self._precondition(
             bool(stmt.lvalues), "assignment statements should have at least one lvalue", stmt_loc
@@ -327,8 +327,8 @@ class ModuleASTConverter(
             return []
         if stmt.is_alias_def:
             match stmt.rvalue:
-                case mypy.nodes.RefExpr(
-                    is_alias_rvalue=True, node=mypy.nodes.TypeInfo(fullname=alias_fullname)
+                case nypy.nodes.RefExpr(
+                    is_alias_rvalue=True, node=nypy.nodes.TypeInfo(fullname=alias_fullname)
                 ):
                     maybe_aliased_pytype = self.context.lookup_pytype(alias_fullname)
                     if maybe_aliased_pytype is None:
@@ -337,9 +337,9 @@ class ModuleASTConverter(
                         )
                         return []
                     aliased_pytype = maybe_aliased_pytype
-                case mypy.nodes.IndexExpr(
-                    analyzed=mypy.nodes.TypeAliasExpr(
-                        node=mypy.nodes.TypeAlias(alias_tvars=[], target=alias_type)
+                case nypy.nodes.IndexExpr(
+                    analyzed=nypy.nodes.TypeAliasExpr(
+                        node=nypy.nodes.TypeAlias(alias_tvars=[], target=alias_type)
                     )
                 ):
                     aliased_pytype = self.context.type_to_pytype(
@@ -362,14 +362,14 @@ class ModuleASTConverter(
         return []
 
     def _check_assignment_lvalues(
-        self, lvalues: list[mypy.nodes.Lvalue]
-    ) -> typing.TypeGuard[list[mypy.nodes.NameExpr]]:
+        self, lvalues: list[nypy.nodes.Lvalue]
+    ) -> typing.TypeGuard[list[nypy.nodes.NameExpr]]:
         """Does some pre-condition checks, including that all lvalues are simple (ie name-exprs),
         hence the TypeGuard return type. If it returns True, then we should try and handle the
         assignment."""
         result = True
         for lvalue in lvalues:
-            if not isinstance(lvalue, mypy.nodes.NameExpr):
+            if not isinstance(lvalue, nypy.nodes.NameExpr):
                 self._error(
                     "Only straight-forward assignment targets supported at module level", lvalue
                 )
@@ -403,7 +403,7 @@ class ModuleASTConverter(
                     lvalue._fullname = fullname  # noqa: SLF001
         return result
 
-    def visit_block(self, block: mypy.nodes.Block) -> StatementResult:
+    def visit_block(self, block: nypy.nodes.Block) -> StatementResult:
         result = StatementResult()
         for stmt in block.body:
             items = stmt.accept(self)
@@ -412,14 +412,14 @@ class ModuleASTConverter(
 
     # Expressions
 
-    def visit_name_expr(self, expr: mypy.nodes.NameExpr) -> ConstantValue:
+    def visit_name_expr(self, expr: nypy.nodes.NameExpr) -> ConstantValue:
         match expr.name:
             case "True":
                 return True
             case "False":
                 return False
         # TODO: is the GDEF check always valid?
-        if not isinstance(expr.node, mypy.nodes.Var) or expr.kind != mypy.nodes.GDEF:
+        if not isinstance(expr.node, nypy.nodes.Var) or expr.kind != nypy.nodes.GDEF:
             self._unsupported(
                 expr,
                 "references to anything other than module-level constants "
@@ -434,16 +434,16 @@ class ModuleASTConverter(
             )
         return value
 
-    def visit_unary_expr(self, expr: mypy.nodes.UnaryExpr) -> ConstantValue:
+    def visit_unary_expr(self, expr: nypy.nodes.UnaryExpr) -> ConstantValue:
         value = expr.expr.accept(self)
         return fold_unary_expr(self._location(expr), expr.op, value)
 
-    def visit_op_expr(self, expr: mypy.nodes.OpExpr) -> ConstantValue:
+    def visit_op_expr(self, expr: nypy.nodes.OpExpr) -> ConstantValue:
         left_value = expr.left.accept(self)
         right_value = expr.right.accept(self)
         return fold_binary_expr(self._location(expr), expr.op, left_value, right_value)
 
-    def visit_comparison_expr(self, expr: mypy.nodes.ComparisonExpr) -> ConstantValue:
+    def visit_comparison_expr(self, expr: nypy.nodes.ComparisonExpr) -> ConstantValue:
         match (expr.operators, expr.operands):
             case ([op], [expr_left, expr_right]):
                 lhs = expr_left.accept(self)
@@ -454,22 +454,22 @@ class ModuleASTConverter(
                     expr, details="chained comparisons not supported at module level"
                 )
 
-    def visit_int_expr(self, expr: mypy.nodes.IntExpr) -> ConstantValue:
+    def visit_int_expr(self, expr: nypy.nodes.IntExpr) -> ConstantValue:
         return expr.value
 
-    def visit_str_expr(self, expr: mypy.nodes.StrExpr) -> ConstantValue:
+    def visit_str_expr(self, expr: nypy.nodes.StrExpr) -> ConstantValue:
         return expr.value
 
-    def visit_bytes_expr(self, expr: mypy.nodes.BytesExpr) -> ConstantValue:
+    def visit_bytes_expr(self, expr: nypy.nodes.BytesExpr) -> ConstantValue:
         return extract_bytes_literal_from_mypy(expr)
 
-    def visit_member_expr(self, expr: mypy.nodes.MemberExpr) -> ConstantValue:
+    def visit_member_expr(self, expr: nypy.nodes.MemberExpr) -> ConstantValue:
         if (
-            isinstance(expr.node, mypy.nodes.Var)
-            and expr.kind == mypy.nodes.GDEF
+            isinstance(expr.node, nypy.nodes.Var)
+            and expr.kind == nypy.nodes.GDEF
             and expr.fullname
-            and isinstance(expr.expr, mypy.nodes.RefExpr)
-            and isinstance(expr.expr.node, mypy.nodes.MypyFile)
+            and isinstance(expr.expr, nypy.nodes.RefExpr)
+            and isinstance(expr.expr.node, nypy.nodes.MypyFile)
         ):
             try:
                 return self.context.constants[expr.fullname]
@@ -480,53 +480,53 @@ class ModuleASTConverter(
         else:
             self._unsupported(expr)
 
-    def visit_call_expr(self, expr: mypy.nodes.CallExpr) -> ConstantValue:
+    def visit_call_expr(self, expr: nypy.nodes.CallExpr) -> ConstantValue:
         # unfortunately, mypy doesn't preserve f-string identification info,
         # they get translated into either a str.join or str.format call at the top level
         # References:
         # https://github.com/python/mypy/blob/cb813259c3b9dff6aaa8686793cf6a0634cf1f69/mypy/fastparse.py#L1528
         # https://github.com/python/mypy/blob/cb813259c3b9dff6aaa8686793cf6a0634cf1f69/mypy/fastparse.py#L1550
         match expr:
-            case mypy.nodes.CallExpr(
-                callee=mypy.nodes.MemberExpr(expr=mypy.nodes.StrExpr(value=joiner), name="join"),
-                args=[mypy.nodes.ListExpr() as args_list],
+            case nypy.nodes.CallExpr(
+                callee=nypy.nodes.MemberExpr(expr=nypy.nodes.StrExpr(value=joiner), name="join"),
+                args=[nypy.nodes.ListExpr() as args_list],
             ):
                 args = [arg.accept(self) for arg in args_list.items]
                 assert all(isinstance(x, str) for x in args)
                 result = joiner.join(map(str, args))
                 return result
-            case mypy.nodes.CallExpr(
-                callee=mypy.nodes.MemberExpr(
-                    expr=mypy.nodes.StrExpr(value=format_str), name="format"
+            case nypy.nodes.CallExpr(
+                callee=nypy.nodes.MemberExpr(
+                    expr=nypy.nodes.StrExpr(value=format_str), name="format"
                 )
             ):
                 args = [arg.accept(self) for arg in expr.args]
                 return format_str.format(*args)
-            case mypy.nodes.CallExpr(
-                callee=mypy.nodes.MemberExpr(
-                    expr=mypy.nodes.StrExpr(value=str_value), name="encode"
+            case nypy.nodes.CallExpr(
+                callee=nypy.nodes.MemberExpr(
+                    expr=nypy.nodes.StrExpr(value=str_value), name="encode"
                 ),
-                args=[mypy.nodes.StrExpr(value=encoding)],
+                args=[nypy.nodes.StrExpr(value=encoding)],
                 arg_names=[("encoding" | None)],
             ):
                 return str_value.encode(encoding=encoding)
-            case mypy.nodes.CallExpr(
-                callee=mypy.nodes.MemberExpr(
-                    expr=mypy.nodes.StrExpr(value=str_value), name="encode"
+            case nypy.nodes.CallExpr(
+                callee=nypy.nodes.MemberExpr(
+                    expr=nypy.nodes.StrExpr(value=str_value), name="encode"
                 ),
                 args=[],
             ):
                 return str_value.encode()
         return self._unsupported(expr)
 
-    def visit_conditional_expr(self, expr: mypy.nodes.ConditionalExpr) -> ConstantValue:
+    def visit_conditional_expr(self, expr: nypy.nodes.ConditionalExpr) -> ConstantValue:
         if self._evaluate_compile_time_constant_condition(expr.cond):
             return expr.if_expr.accept(self)
         else:
             return expr.else_expr.accept(self)
 
-    def _evaluate_compile_time_constant_condition(self, expr: mypy.nodes.Expression) -> bool:
-        from mypy import reachability
+    def _evaluate_compile_time_constant_condition(self, expr: nypy.nodes.Expression) -> bool:
+        from nypy import reachability
 
         kind = reachability.infer_condition_value(expr, self.context.mypy_options)
         if kind == reachability.TRUTH_VALUE_UNKNOWN:
@@ -550,7 +550,7 @@ class ModuleASTConverter(
 
     def _unsupported(
         self,
-        node: mypy.nodes.Node,
+        node: nypy.nodes.Node,
         details: str = "not supported at module level",
         ex: Exception | None = None,
     ) -> typing.Never:
@@ -558,79 +558,79 @@ class ModuleASTConverter(
 
     # Unsupported Statements
 
-    def visit_expression_stmt(self, stmt: mypy.nodes.ExpressionStmt) -> StatementResult:
-        if isinstance(stmt.expr, mypy.nodes.StrExpr):
+    def visit_expression_stmt(self, stmt: nypy.nodes.ExpressionStmt) -> StatementResult:
+        if isinstance(stmt.expr, nypy.nodes.StrExpr):
             # ignore any doc-strings at module level
             return []
         else:
             return self._unsupported(stmt)
 
-    def visit_while_stmt(self, stmt: mypy.nodes.WhileStmt) -> StatementResult:
+    def visit_while_stmt(self, stmt: nypy.nodes.WhileStmt) -> StatementResult:
         return self._unsupported(stmt)
 
-    def visit_for_stmt(self, stmt: mypy.nodes.ForStmt) -> StatementResult:
+    def visit_for_stmt(self, stmt: nypy.nodes.ForStmt) -> StatementResult:
         return self._unsupported(stmt)
 
-    def visit_break_stmt(self, stmt: mypy.nodes.BreakStmt) -> StatementResult:
+    def visit_break_stmt(self, stmt: nypy.nodes.BreakStmt) -> StatementResult:
         return self._unsupported(stmt)
 
-    def visit_continue_stmt(self, stmt: mypy.nodes.ContinueStmt) -> StatementResult:
+    def visit_continue_stmt(self, stmt: nypy.nodes.ContinueStmt) -> StatementResult:
         return self._unsupported(stmt)
 
-    def visit_assert_stmt(self, stmt: mypy.nodes.AssertStmt) -> StatementResult:
+    def visit_assert_stmt(self, stmt: nypy.nodes.AssertStmt) -> StatementResult:
         return self._unsupported(stmt)
 
-    def visit_del_stmt(self, stmt: mypy.nodes.DelStmt) -> StatementResult:
+    def visit_del_stmt(self, stmt: nypy.nodes.DelStmt) -> StatementResult:
         return self._unsupported(stmt)
 
-    def visit_match_stmt(self, stmt: mypy.nodes.MatchStmt) -> StatementResult:
+    def visit_match_stmt(self, stmt: nypy.nodes.MatchStmt) -> StatementResult:
         return self._unsupported(stmt)
 
-    def visit_type_alias_stmt(self, stmt: mypy.nodes.TypeAliasStmt) -> StatementResult:
+    def visit_type_alias_stmt(self, stmt: nypy.nodes.TypeAliasStmt) -> StatementResult:
         return self._unsupported(stmt)
 
     # the remaining statements (below) are invalid at the module lexical scope,
     # mypy should have caught these errors already
-    def visit_return_stmt(self, stmt: mypy.nodes.ReturnStmt) -> StatementResult:
+    def visit_return_stmt(self, stmt: nypy.nodes.ReturnStmt) -> StatementResult:
         raise InternalError("encountered return statement at module level", self._location(stmt))
 
     # Unsupported Expressions
 
-    def visit_super_expr(self, expr: mypy.nodes.SuperExpr) -> ConstantValue:
+    def visit_super_expr(self, expr: nypy.nodes.SuperExpr) -> ConstantValue:
         return self._unsupported(expr)
 
-    def visit_index_expr(self, expr: mypy.nodes.IndexExpr) -> ConstantValue:
+    def visit_index_expr(self, expr: nypy.nodes.IndexExpr) -> ConstantValue:
         return self._unsupported(expr)
 
-    def visit_ellipsis(self, expr: mypy.nodes.EllipsisExpr) -> ConstantValue:
+    def visit_ellipsis(self, expr: nypy.nodes.EllipsisExpr) -> ConstantValue:
         return self._unsupported(expr)
 
-    def visit_dict_expr(self, expr: mypy.nodes.DictExpr) -> ConstantValue:
+    def visit_dict_expr(self, expr: nypy.nodes.DictExpr) -> ConstantValue:
         return self._unsupported(expr)
 
-    def visit_list_expr(self, expr: mypy.nodes.ListExpr) -> ConstantValue:
+    def visit_list_expr(self, expr: nypy.nodes.ListExpr) -> ConstantValue:
         return self._unsupported(expr)
 
-    def visit_tuple_expr(self, expr: mypy.nodes.TupleExpr) -> ConstantValue:
+    def visit_tuple_expr(self, expr: nypy.nodes.TupleExpr) -> ConstantValue:
         return self._unsupported(expr)
 
-    def visit_list_comprehension(self, expr: mypy.nodes.ListComprehension) -> ConstantValue:
+    def visit_list_comprehension(self, expr: nypy.nodes.ListComprehension) -> ConstantValue:
         return self._unsupported(expr)
 
-    def visit_slice_expr(self, expr: mypy.nodes.SliceExpr) -> ConstantValue:
+    def visit_slice_expr(self, expr: nypy.nodes.SliceExpr) -> ConstantValue:
         return self._unsupported(expr)
 
-    def visit_assignment_expr(self, o: mypy.nodes.AssignmentExpr) -> ConstantValue:
+    def visit_assignment_expr(self, o: nypy.nodes.AssignmentExpr) -> ConstantValue:
         return self._unsupported(o)
 
-    def visit_lambda_expr(self, expr: mypy.nodes.LambdaExpr) -> ConstantValue:
+    def visit_lambda_expr(self, expr: nypy.nodes.LambdaExpr) -> ConstantValue:
         return self._unsupported(expr)
 
 
 def _process_contract_class_options(
     context: ASTConversionModuleContext,
-    expr_visitor: mypy.visitor.ExpressionVisitor[ConstantValue],
-    cdef: mypy.nodes.ClassDef,
+    expr_visitor: nypy.visitor.ExpressionVisitor[ConstantValue],
+    cdef: nypy.nodes.ClassDef,
 ) -> ContractClassOptions:
     name_override: str | None = None
     scratch_slot_reservations = set[int]()
@@ -646,7 +646,7 @@ def _process_contract_class_options(
                     else:
                         context.error("unexpected argument type", kw_expr)
                 case "scratch_slots":
-                    if isinstance(kw_expr, mypy.nodes.TupleExpr | mypy.nodes.ListExpr):
+                    if isinstance(kw_expr, nypy.nodes.TupleExpr | nypy.nodes.ListExpr):
                         slot_items = kw_expr.items
                     else:
                         slot_items = [kw_expr]
@@ -663,7 +663,7 @@ def _process_contract_class_options(
                         else:
                             scratch_slot_reservations.update(slots)
                 case "state_totals":
-                    if not isinstance(kw_expr, mypy.nodes.CallExpr):
+                    if not isinstance(kw_expr, nypy.nodes.CallExpr):
                         context.error("unexpected argument type", kw_expr)
                     else:
                         arg_map = dict[str, int]()
@@ -696,32 +696,32 @@ def _process_contract_class_options(
 
 
 def _process_dataclass_like_fields(
-    context: ASTConversionModuleContext, cdef: mypy.nodes.ClassDef, base_type: pytypes.PyType
+    context: ASTConversionModuleContext, cdef: nypy.nodes.ClassDef, base_type: pytypes.PyType
 ) -> dict[str, pytypes.PyType] | None:
     fields = dict[str, pytypes.PyType]()
     has_error = False
     for stmt in cdef.defs.body:
         stmt_loc = context.node_location(stmt)
         match stmt:
-            case mypy.nodes.ExpressionStmt(expr=mypy.nodes.StrExpr()):
+            case nypy.nodes.ExpressionStmt(expr=nypy.nodes.StrExpr()):
                 # ignore class docstring, already extracted
                 # TODO: should we capture field "docstrings"?
                 pass
-            case mypy.nodes.AssignmentStmt(
-                lvalues=[mypy.nodes.NameExpr(name=field_name)],
-                rvalue=mypy.nodes.TempNode(),
-                type=mypy.types.Type() as mypy_type,
+            case nypy.nodes.AssignmentStmt(
+                lvalues=[nypy.nodes.NameExpr(name=field_name)],
+                rvalue=nypy.nodes.TempNode(),
+                type=nypy.types.Type() as mypy_type,
             ):
                 pytype = context.type_to_pytype(mypy_type, source_location=stmt_loc)
                 fields[field_name] = pytype
                 if isinstance((maybe_err := pytype.wtype), str):
                     logger.error(maybe_err, location=stmt_loc)
                     has_error = True
-            case mypy.nodes.SymbolNode(name=symbol_name) if (
+            case nypy.nodes.SymbolNode(name=symbol_name) if (
                 cdef.info.names[symbol_name].plugin_generated
             ):
                 pass
-            case mypy.nodes.PassStmt():
+            case nypy.nodes.PassStmt():
                 pass
             case _:
                 logger.error(
@@ -732,7 +732,7 @@ def _process_dataclass_like_fields(
 
 
 def _process_struct(
-    context: ASTConversionModuleContext, base: pytypes.PyType, cdef: mypy.nodes.ClassDef
+    context: ASTConversionModuleContext, base: pytypes.PyType, cdef: nypy.nodes.ClassDef
 ) -> StatementResult:
     fields = _process_dataclass_like_fields(context, cdef, base)
     if fields is None:
@@ -753,7 +753,7 @@ def _process_struct(
 
 
 def _process_named_tuple(
-    context: ASTConversionModuleContext, cdef: mypy.nodes.ClassDef
+    context: ASTConversionModuleContext, cdef: nypy.nodes.ClassDef
 ) -> StatementResult:
     fields = _process_dataclass_like_fields(context, cdef, pytypes.NamedTupleBaseType)
     if fields is None:
@@ -771,10 +771,10 @@ def _process_named_tuple(
 
 def _map_scratch_space_reservation(
     context: ASTConversionModuleContext,
-    expr_visitor: mypy.visitor.ExpressionVisitor[ConstantValue],
-    expr: mypy.nodes.Expression,
+    expr_visitor: nypy.visitor.ExpressionVisitor[ConstantValue],
+    expr: nypy.nodes.Expression,
 ) -> list[int]:
-    def get_int_arg(arg_expr: mypy.nodes.Expression, *, error_msg: str) -> int:
+    def get_int_arg(arg_expr: nypy.nodes.Expression, *, error_msg: str) -> int:
         const_value = arg_expr.accept(expr_visitor)
         if isinstance(const_value, int):
             return const_value
@@ -782,8 +782,8 @@ def _map_scratch_space_reservation(
 
     expr_loc = context.node_location(expr)
     match expr:
-        case mypy.nodes.CallExpr(
-            callee=mypy.nodes.RefExpr() as callee, args=args
+        case nypy.nodes.CallExpr(
+            callee=nypy.nodes.RefExpr() as callee, args=args
         ) if get_unaliased_fullname(callee) == constants.URANGE:
             if not args:
                 raise CodeError("Expected at least one argument to urange", expr_loc)

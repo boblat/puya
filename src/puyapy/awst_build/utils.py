@@ -6,11 +6,10 @@ import warnings
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from itertools import zip_longest
 
-import mypy.build
-import mypy.nodes
-import mypy.types
-from mypy.types import get_proper_type, is_named_instance
-
+import nypy.build
+import nypy.nodes
+import nypy.types
+from nypy.types import get_proper_type, is_named_instance
 from puya import log
 from puya.errors import CodeError, InternalError
 from puya.parse import SourceLocation
@@ -24,28 +23,28 @@ from puyapy.models import ConstantValue
 logger = log.get_logger(__name__)
 
 
-def refers_to_fullname(ref_expr: mypy.nodes.RefExpr, *fullnames: str) -> bool:
+def refers_to_fullname(ref_expr: nypy.nodes.RefExpr, *fullnames: str) -> bool:
     """Is node a name or member expression with the given full name?"""
-    if isinstance(ref_expr.node, mypy.nodes.TypeAlias):
+    if isinstance(ref_expr.node, nypy.nodes.TypeAlias):
         return is_named_instance(ref_expr.node.target, fullnames)
     else:
         return ref_expr.fullname in fullnames
 
 
-def get_unaliased_fullname(ref_expr: mypy.nodes.RefExpr) -> str:
+def get_unaliased_fullname(ref_expr: nypy.nodes.RefExpr) -> str:
     alias = get_aliased_instance(ref_expr)
     if alias:
         return alias.type.fullname
     return ref_expr.fullname
 
 
-def get_aliased_instance(ref_expr: mypy.nodes.RefExpr) -> mypy.types.Instance | None:
-    if isinstance(ref_expr.node, mypy.nodes.TypeAlias):
+def get_aliased_instance(ref_expr: nypy.nodes.RefExpr) -> nypy.types.Instance | None:
+    if isinstance(ref_expr.node, nypy.nodes.TypeAlias):
         t = get_proper_type(ref_expr.node.target)
-        if isinstance(t, mypy.types.Instance):
+        if isinstance(t, nypy.types.Instance):
             return t
         if (
-            isinstance(t, mypy.types.TupleType)
+            isinstance(t, nypy.types.TupleType)
             and t.partial_fallback.type.fullname != "builtins.tuple"
         ):
             return t.partial_fallback
@@ -54,16 +53,16 @@ def get_aliased_instance(ref_expr: mypy.nodes.RefExpr) -> mypy.types.Instance | 
 
 def get_decorators_by_fullname(
     ctx: ASTConversionModuleContext,
-    decorator: mypy.nodes.Decorator,
+    decorator: nypy.nodes.Decorator,
     *,
     original: bool = False,
-) -> dict[str, mypy.nodes.Expression]:
-    result = dict[str, mypy.nodes.Expression]()
+) -> dict[str, nypy.nodes.Expression]:
+    result = dict[str, nypy.nodes.Expression]()
     for d in decorator.original_decorators if original else decorator.decorators:
-        if isinstance(d, mypy.nodes.RefExpr):
+        if isinstance(d, nypy.nodes.RefExpr):
             full_name = get_unaliased_fullname(d)
             result[get_unaliased_fullname(d)] = d
-        elif isinstance(d, mypy.nodes.CallExpr) and isinstance(d.callee, mypy.nodes.RefExpr):
+        elif isinstance(d, nypy.nodes.CallExpr) and isinstance(d.callee, nypy.nodes.RefExpr):
             full_name = get_unaliased_fullname(d.callee)
         else:
             raise CodeError("Unsupported decorator usage", ctx.node_location(d))
@@ -155,7 +154,7 @@ def fold_binary_expr(
     return result
 
 
-def extract_bytes_literal_from_mypy(expr: mypy.nodes.BytesExpr) -> bytes:
+def extract_bytes_literal_from_mypy(expr: nypy.nodes.BytesExpr) -> bytes:
     import ast
 
     bytes_str = expr.value
@@ -242,15 +241,15 @@ def snake_case(s: str) -> str:
 
 
 def require_callable_type(
-    node: mypy.nodes.FuncBase | mypy.nodes.Decorator, location: SourceLocation
-) -> mypy.types.CallableType:
-    if isinstance(node, mypy.nodes.Decorator):
+    node: nypy.nodes.FuncBase | nypy.nodes.Decorator, location: SourceLocation
+) -> nypy.types.CallableType:
+    if isinstance(node, nypy.nodes.Decorator):
         typ = node.var.type
     else:
         typ = node.type
     if typ is None:
         raise InternalError(f"unable to resolve type of {node.fullname}", location)
-    if not isinstance(typ, mypy.types.CallableType):
+    if not isinstance(typ, nypy.types.CallableType):
         raise CodeError("expected a callable type", location)
     return typ
 
@@ -286,28 +285,28 @@ def determine_base_type(
 
 
 def extract_decorator_args(
-    decorator: mypy.nodes.Expression, location: SourceLocation
-) -> list[tuple[str | None, mypy.nodes.Expression]]:
+    decorator: nypy.nodes.Expression, location: SourceLocation
+) -> list[tuple[str | None, nypy.nodes.Expression]]:
     match decorator:
-        case mypy.nodes.RefExpr():
+        case nypy.nodes.RefExpr():
             return []
-        case mypy.nodes.CallExpr(args=args, arg_names=arg_names):
+        case nypy.nodes.CallExpr(args=args, arg_names=arg_names):
             return list(zip(arg_names, args, strict=True))
         case unexpected_node:
             raise InternalError(f"unexpected decorator node: {unexpected_node}", location)
 
 
 def get_subroutine_decorator_inline_arg(
-    context: ASTConversionModuleContext, decorator: mypy.nodes.Expression
+    context: ASTConversionModuleContext, decorator: nypy.nodes.Expression
 ) -> bool | None:
     args = extract_decorator_args(decorator, context.node_location(decorator))
     for name, expr in args:
         match name, expr:
-            case "inline", mypy.nodes.NameExpr(fullname="builtins.True"):
+            case "inline", nypy.nodes.NameExpr(fullname="builtins.True"):
                 return True
-            case "inline", mypy.nodes.NameExpr(fullname="builtins.False"):
+            case "inline", nypy.nodes.NameExpr(fullname="builtins.False"):
                 return False
-            case "inline", mypy.nodes.NameExpr(fullname="builtins.None"):
+            case "inline", nypy.nodes.NameExpr(fullname="builtins.None"):
                 return None
             case _:
                 logger.error("unexpected argument", location=context.node_location(expr))

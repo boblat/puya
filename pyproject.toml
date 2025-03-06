@@ -96,7 +96,7 @@ filterwarnings = [
 ]
 xfail_strict = true
 pythonpath = [
-    "src/puyapy/_vendor",
+    # "src/puyapy/_vendor",
 ]
 
 [tool.mypy]
@@ -107,7 +107,7 @@ untyped_calls_exclude = [
 ]
 exclude = [
     "src/puyapy/_typeshed",
-    "src/puyapy/_vendor",
+    "src/nypy/typeshed",
     "stubs/algopy\\.py",
 ]
 
@@ -127,7 +127,7 @@ target-version = "py312"
 line-length = 99
 extend-exclude = [
     "src/puyapy/_typeshed",
-    "src/puyapy/_vendor",
+    "src/nypy",
     "test_cases/constants/non_utf8.py", # E902 ruff doesn't read this file encoding
 ]
 # force-exclude ensures these files are excluded even when run via pre-commit

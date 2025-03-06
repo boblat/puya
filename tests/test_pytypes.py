@@ -9,8 +9,7 @@ _STUB_SUFFIX = ".pyi"
 
 
 def stub_class_names_and_predefined_aliases() -> list[str]:
-    from mypy import build, find_sources, fscache, nodes
-
+    from nypy import build, find_sources, fscache, nodes
     from puyapy.compile import get_mypy_options
 
     stubs_dir = (VCS_ROOT / "stubs" / "algopy-stubs").resolve()

@@ -3,9 +3,9 @@ import typing
 from collections.abc import Callable, Iterable
 
 import attrs
-import mypy.nodes
-import mypy.visitor
 
+import nypy.nodes
+import nypy.visitor
 from puya import log
 from puya.avm import TransactionType
 from puya.awst import wtypes
@@ -36,7 +36,7 @@ def _is_arc4_struct(typ: pytypes.PyType) -> typing.TypeGuard[pytypes.StructType]
 @attrs.frozen
 class _DecoratorData:
     fullname: str
-    args: list[tuple[str | None, mypy.nodes.Expression]]
+    args: list[tuple[str | None, nypy.nodes.Expression]]
     source_location: SourceLocation
 
 

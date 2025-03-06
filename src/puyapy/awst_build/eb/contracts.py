@@ -2,8 +2,8 @@ import typing
 from collections.abc import Sequence
 
 import attrs
-import mypy.nodes
 
+import nypy.nodes
 from puya import log
 from puya.awst.nodes import (
     AppStateExpression,
@@ -48,7 +48,7 @@ class ContractTypeExpressionBuilder(TypeBuilder[pytypes.ContractType]):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[mypy.nodes.ArgKind],
+        arg_kinds: list[nypy.nodes.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -64,7 +64,7 @@ class ContractTypeExpressionBuilder(TypeBuilder[pytypes.ContractType]):
         func_type = attrs.evolve(
             sym_type,
             args=[
-                pytypes.FuncArg(type=self.produces(), name=None, kind=mypy.nodes.ArgKind.ARG_POS),
+                pytypes.FuncArg(type=self.produces(), name=None, kind=nypy.nodes.ArgKind.ARG_POS),
                 *sym_type.args,
             ],
         )

@@ -1,8 +1,7 @@
 import typing
 from collections.abc import Sequence
 
-import mypy.nodes
-
+import nypy.nodes
 from puya.awst.nodes import Expression
 from puya.parse import SourceLocation
 from puyapy.awst_build import pytypes
@@ -18,7 +17,7 @@ class StructSubclassExpressionBuilder(TypeBuilder[pytypes.StructType]):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[mypy.nodes.ArgKind],
+        arg_kinds: list[nypy.nodes.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:

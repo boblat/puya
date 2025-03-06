@@ -19,8 +19,7 @@ from puya.utils import lazy_setdefault, unique
 from puyapy.awst_build import constants
 
 if typing.TYPE_CHECKING:
-    from mypy.nodes import ArgKind
-
+    from nypy.nodes import ArgKind
     from puyapy.awst_build.intrinsic_models import (
         OpMappingWithOverloads,
         PropertyOpMapping,
