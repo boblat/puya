@@ -64,9 +64,6 @@ from nypy.util import (
     time_spent_us,
 )
 
-if TYPE_CHECKING:
-    from nypy.report import Reports  # Avoid unconditional slow import
-
 from nypy import errorcodes as codes
 from nypy.config_parser import parse_mypy_comments
 from nypy.fixup import fixup_module
@@ -224,13 +221,6 @@ def _build(
 
     search_paths = compute_search_paths(sources, options, data_dir, alt_lib_path)
 
-    reports = None
-    if options.report_dirs:
-        # Import lazily to avoid slowing down startup.
-        from nypy.report import Reports
-
-        reports = Reports(data_dir, options.report_dirs)
-
     source_set = BuildSourceSet(sources)
     cached_read = fscache.read
     errors = Errors(options, read_source=lambda path: read_py_file(path, cached_read))
@@ -247,7 +237,6 @@ def _build(
         search_paths,
         ignore_prefix=os.getcwd(),
         source_set=source_set,
-        reports=reports,
         options=options,
         version_id=__version__,
         plugin=plugin,
@@ -285,9 +274,6 @@ def _build(
             )
         )
         manager.dump_stats()
-        if reports is not None:
-            # Finish the HTML or XML reports even if CompileError was raised.
-            reports.finish()
         if not cache_dir_existed and os.path.isdir(options.cache_dir):
             add_catch_all_gitignore(options.cache_dir)
             exclude_from_backups(options.cache_dir)
@@ -598,7 +584,6 @@ class BuildManager:
         search_paths: SearchPaths,
         ignore_prefix: str,
         source_set: BuildSourceSet,
-        reports: Reports | None,
         options: Options,
         version_id: str,
         plugin: Plugin,
@@ -620,7 +605,6 @@ class BuildManager:
         self.error_formatter = error_formatter
         self.search_paths = search_paths
         self.source_set = source_set
-        self.reports = reports
         self.options = options
         self.version_id = version_id
         self.modules: dict[str, MypyFile] = {}
@@ -650,11 +634,8 @@ class BuildManager:
         self.stale_modules: set[str] = set()
         self.rechecked_modules: set[str] = set()
         self.flush_errors = flush_errors
-        has_reporters = reports is not None and reports.reporters
-        self.cache_enabled = (
-            options.incremental
-            and (not options.fine_grained_incremental or options.use_fine_grained_cache)
-            and not has_reporters
+        self.cache_enabled = options.incremental and (
+            not options.fine_grained_incremental or options.use_fine_grained_cache
         )
         self.fscache = fscache
         self.find_module_cache = FindModuleCache(
@@ -863,12 +844,6 @@ class BuildManager:
         val = {k: set(v) for k, v in deps.items()}
         self.add_stats(load_fg_deps_time=time.time() - t0)
         return val
-
-    def report_file(
-        self, file: MypyFile, type_map: dict[Expression, Type], options: Options
-    ) -> None:
-        if self.reports is not None and self.source_set.is_source(file):
-            self.reports.file(file, self.modules, type_map, options)
 
     def verbosity(self) -> int:
         return self.options.verbosity
@@ -2396,7 +2371,6 @@ class State:
                     inferred=True,
                     typemap=self.type_map(),
                 )
-            manager.report_file(self.tree, self.type_map(), self.options)
 
             self.update_fine_grained_deps(self.manager.fg_deps)
 

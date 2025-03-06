@@ -110,7 +110,6 @@ class Options:
         # The abspath() version of the above, we compute it once as an optimization.
         self.abs_custom_typeshed_dir: str | None = None
         self.mypy_path: list[str] = []
-        self.report_dirs: dict[str, str] = {}
         # Show errors in PEP 561 packages/site-packages modules
         self.no_silence_site_packages = False
         self.no_site_packages = False
