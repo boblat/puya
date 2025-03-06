@@ -41,7 +41,6 @@ if TYPE_CHECKING:
 
 
 orig_stat: Final = os.stat
-MEM_PROFILE: Final = False  # If True, dump memory profile
 
 
 def stat_proxy(path: str) -> os.stat_result:
@@ -127,11 +126,6 @@ def main(
             print()
             res, messages, blockers = run_build(sources, options, fscache, t0, stdout, stderr)
         show_messages(messages, stderr, formatter, options)
-
-    if MEM_PROFILE:
-        from nypy.memprofile import print_memory_profile
-
-        print_memory_profile()
 
     code = 0
     n_errors, n_notes, n_files = util.count_stats(messages)
