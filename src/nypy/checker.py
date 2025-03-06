@@ -7114,7 +7114,7 @@ class TypeChecker(NodeVisitor[None], CheckerPluginInterface):
         sym = self.lookup_qualified(name)
         node = sym.node
         if isinstance(node, TypeAlias):
-            assert isinstance(node.target, Instance)  # type: ignore[misc]
+            assert isinstance(node.target, Instance)
             node = node.target.type
         assert isinstance(node, TypeInfo)
         any_type = AnyType(TypeOfAny.from_omitted_generics)

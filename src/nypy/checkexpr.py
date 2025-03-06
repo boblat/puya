@@ -394,9 +394,7 @@ class ExpressionChecker(ExpressionVisitor[Type]):
                 result = TypeType(NoneType())
             else:
                 result = type_object_type(node, self.named_type)
-            if isinstance(result, CallableType) and isinstance(  # type: ignore[misc]
-                result.ret_type, Instance
-            ):
+            if isinstance(result, CallableType) and isinstance(result.ret_type, Instance):
                 # We need to set correct line and column
                 # TODO: always do this in type_object_type by passing the original context
                 result.ret_type.line = e.line
@@ -4802,7 +4800,7 @@ class ExpressionChecker(ExpressionVisitor[Type]):
         """
         if alias.python_3_12_type_alias:
             return self.type_alias_type_type()
-        if isinstance(alias.target, Instance) and alias.target.invalid:  # type: ignore[misc]
+        if isinstance(alias.target, Instance) and alias.target.invalid:
             # An invalid alias, error already has been reported
             return AnyType(TypeOfAny.from_error)
         # If this is a generic alias, we set all variables to `Any`.

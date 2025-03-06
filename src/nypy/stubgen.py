@@ -925,7 +925,7 @@ class ASTStubGenerator(BaseStubGenerator, nypy.traverser.TraverserVisitor):
                 continue
             if isinstance(lvalue, (TupleExpr, ListExpr)):
                 items = lvalue.items
-                if isinstance(o.unanalyzed_type, TupleType):  # type: ignore[misc]
+                if isinstance(o.unanalyzed_type, TupleType):
                     annotations: Iterable[Type | None] = o.unanalyzed_type.items
                 else:
                     annotations = [None] * len(items)

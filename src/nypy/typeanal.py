@@ -2190,17 +2190,12 @@ def instantiate_type_alias(
         )
     if max_tv_count == 0 and act_len == 0:
         if no_args:
-            assert isinstance(node.target, Instance)  # type: ignore[misc]
+            assert isinstance(node.target, Instance)
             # Note: this is the only case where we use an eager expansion. See more info about
             # no_args aliases like L = List in the docstring for TypeAlias class.
             return Instance(node.target.type, [], line=ctx.line, column=ctx.column)
         return TypeAliasType(node, [], line=ctx.line, column=ctx.column)
-    if (
-        max_tv_count == 0
-        and act_len > 0
-        and isinstance(node.target, Instance)  # type: ignore[misc]
-        and no_args
-    ):
+    if max_tv_count == 0 and act_len > 0 and isinstance(node.target, Instance) and no_args:
         tp = Instance(node.target.type, args)
         tp.line = ctx.line
         tp.column = ctx.column
@@ -2272,7 +2267,7 @@ def instantiate_type_alias(
     assert typ.alias is not None
     # HACK: Implement FlexibleAlias[T, typ] by expanding it to typ here.
     if (
-        isinstance(typ.alias.target, Instance)  # type: ignore[misc]
+        isinstance(typ.alias.target, Instance)
         and typ.alias.target.type.fullname == "mypy_extensions.FlexibleAlias"
     ):
         exp = get_proper_type(typ)

@@ -1184,9 +1184,9 @@ class ASTConverter:
             default: Type | None = None
             if sys.version_info >= (3, 13):
                 default = TypeConverter(self.errors, line=p.lineno).visit(p.default_value)
-            if isinstance(p, ast_ParamSpec):  # type: ignore[misc]
+            if isinstance(p, ast_ParamSpec):
                 explicit_type_params.append(TypeParam(p.name, PARAM_SPEC_KIND, None, [], default))
-            elif isinstance(p, ast_TypeVarTuple):  # type: ignore[misc]
+            elif isinstance(p, ast_TypeVarTuple):
                 explicit_type_params.append(
                     TypeParam(p.name, TYPE_VAR_TUPLE_KIND, None, [], default)
                 )

@@ -808,7 +808,7 @@ class ConstraintBuilderVisitor(TypeVisitor[list[Constraint]]):
         if isinstance(actual, Instance):
             instance = actual
             erased = erase_typevars(template)
-            assert isinstance(erased, Instance)  # type: ignore[misc]
+            assert isinstance(erased, Instance)
             # We always try nominal inference if possible,
             # it is much faster than the structural one.
             if self.direction == SUBTYPE_OF and template.type.has_base(instance.type.fullname):

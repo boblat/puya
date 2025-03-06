@@ -224,7 +224,7 @@ class TypeTranslator(TypeVisitor[Type]):
         last_known_value: LiteralType | None = None
         if t.last_known_value is not None:
             raw_last_known_value = t.last_known_value.accept(self)
-            assert isinstance(raw_last_known_value, LiteralType)  # type: ignore[misc]
+            assert isinstance(raw_last_known_value, LiteralType)
             last_known_value = raw_last_known_value
         return Instance(
             typ=t.type,
@@ -288,7 +288,7 @@ class TypeTranslator(TypeVisitor[Type]):
 
     def visit_literal_type(self, t: LiteralType, /) -> Type:
         fallback = t.fallback.accept(self)
-        assert isinstance(fallback, Instance)  # type: ignore[misc]
+        assert isinstance(fallback, Instance)
         return LiteralType(value=t.value, fallback=fallback, line=t.line, column=t.column)
 
     def visit_union_type(self, t: UnionType, /) -> Type:
@@ -320,7 +320,7 @@ class TypeTranslator(TypeVisitor[Type]):
         items: list[CallableType] = []
         for item in t.items:
             new = item.accept(self)
-            assert isinstance(new, CallableType)  # type: ignore[misc]
+            assert isinstance(new, CallableType)
             items.append(new)
         return Overloaded(items=items)
 

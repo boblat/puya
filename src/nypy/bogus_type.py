@@ -12,16 +12,10 @@ For those cases some other technique should be used.
 
 from __future__ import annotations
 
-from typing import Any, TypeVar
+from typing import TypeVar
 
 from mypy_extensions import FlexibleAlias
 
 T = TypeVar("T")
 
-# This won't ever be true at runtime, but we consider it true during
-# mypyc compilations.
-MYPYC = False
-if MYPYC:
-    Bogus = FlexibleAlias[T, Any]
-else:
-    Bogus = FlexibleAlias[T, T]
+Bogus = FlexibleAlias[T, T]
