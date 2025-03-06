@@ -162,19 +162,19 @@ def get_mypy_options() -> mypy.options.Options:
 def _get_python_executable() -> str | None:
     prefix = _get_prefix()
     if not prefix:
-        logger.warning("Could not determine python prefix or algopy version")
+        logger.warning("could not determine python prefix or algopy version")
         return None
-    logger.info(f"Found python prefix: {prefix}")
-    venv_paths = sysconfig.get_paths(vars={"base": prefix})
+    logger.info(f"found python prefix: {prefix}")
+    install_paths = sysconfig.get_paths(vars={"base": prefix})
 
     python_exe = None
     for python in ("python3", "python"):
-        python_exe = shutil.which(python, path=venv_paths["scripts"])
+        python_exe = shutil.which(python, path=install_paths["scripts"])
         if python_exe:
-            logger.debug(f"Using python executable: {python_exe}")
+            logger.debug(f"using python executable: {python_exe}")
             break
     else:
-        logger.warning("Found a python prefix, but could not find the expected python interpreter")
+        logger.warning("found a python prefix, but could not find the expected python interpreter")
     # use glob here, as we don't want to assume the python version
     discovered_site_packages = list(
         Path(prefix).glob(str(Path("[Ll]ib") / "**" / "site-packages"))
@@ -183,11 +183,11 @@ def _get_python_executable() -> str | None:
         (site_packages,) = discovered_site_packages
     except ValueError:
         logger.warning(
-            "Found a prefix, but could not find the expected"
+            "found a prefix, but could not find the expected"
             f" site-packages: {prefix=}, {discovered_site_packages=}"
         )
     else:
-        logger.debug(f"Using python site-packages: {site_packages}")
+        logger.debug(f"using python site-packages: {site_packages}")
         _check_algopy_version(site_packages)
 
     return python_exe
@@ -223,7 +223,7 @@ def _check_algopy_version(site_packages: Path) -> None:
         logger.warning("Could not determine algopy version")
         return
     algopy_version = version.parse(algopy.version)
-    logger.debug(f"Found algopy: {algopy_version}")
+    logger.debug(f"found algopy: {algopy_version}")
 
     if not (MIN_SUPPORTED_ALGOPY_VERSION <= algopy_version < MAX_SUPPORTED_ALGOPY_VERSION_EX):
         logger.warning(
