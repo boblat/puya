@@ -34,7 +34,16 @@ import nypy.build
 import nypy.state
 from nypy.checker import FineGrainedDeferredNode
 from nypy.errors import Errors
-from nypy.nodes import Decorator, FuncDef, MypyFile, OverloadedFuncDef, TypeInfo, Var
+from nypy.nodes import (
+    ClassDef,
+    Decorator,
+    FuncDef,
+    MypyFile,
+    OverloadedFuncDef,
+    SymbolTableNode,
+    TypeInfo,
+    Var,
+)
 from nypy.options import Options
 from nypy.plugin import ClassDefContext
 from nypy.plugins import dataclasses as dataclasses_plugin
@@ -52,7 +61,6 @@ from nypy.semanal_classprop import (
 from nypy.semanal_infer import infer_decorator_signature_if_simple
 from nypy.semanal_shared import find_dataclass_transform_spec
 from nypy.semanal_typeargs import TypeArgumentAnalyzer
-from nypy.server.aststrip import SavedAttributes
 from nypy.util import is_typeshed_file
 
 if TYPE_CHECKING:
@@ -60,6 +68,7 @@ if TYPE_CHECKING:
 
 
 Patches: _TypeAlias = list[tuple[int, Callable[[], None]]]
+SavedAttributes: _TypeAlias = dict[tuple[ClassDef, str], SymbolTableNode]
 
 
 # If we perform this many iterations, raise an exception since we are likely stuck.
