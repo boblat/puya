@@ -5,13 +5,9 @@ import typing
 from textwrap import dedent
 
 import nypy.build
-import nypy.find_sources
-import nypy.fscache
 import nypy.nodes
-import nypy.options
 import nypy.types
 import pytest
-from nypy.nodes import RevealExpr
 
 from puyapy.parse import get_mypy_options
 
@@ -64,7 +60,7 @@ def get_revealed_types(
     types = []
 
     class MyVisitor(nypy.traverser.TraverserVisitor):
-        def visit_reveal_expr(self, o: RevealExpr) -> None:
+        def visit_reveal_expr(self, o: nypy.nodes.RevealExpr) -> None:
             types.append(br.types.get(o.expr, nypy.types.UninhabitedType()))
 
     visitor = MyVisitor()
