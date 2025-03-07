@@ -3208,7 +3208,6 @@ class SemanticAnalyzer(
         if not s.type:
             self.process_module_assignment(s.lvalues, s.rvalue, s)
         self.process__all__(s)
-        self.process__deletable__(s)
         self.process__slots__(s)
 
     def analyze_identity_global_assignment(self, s: AssignmentStmt) -> bool:
@@ -4598,12 +4597,6 @@ class SemanticAnalyzer(
                 t, self.options, self.is_typeshed_stub_file, self.msg, context=s
             )
 
-        # mypyc suppresses making copies of a function to check each
-        # possible type, so set the upper bound to Any to prevent that
-        # from causing errors.
-        if values and self.options.mypyc:
-            upper_bound = AnyType(TypeOfAny.implementation_artifact)
-
         # Yes, it's a valid type variable definition! Add it to the symbol table.
         if not call.analyzed:
             type_var = TypeVarExpr(
@@ -5146,29 +5139,6 @@ class SemanticAnalyzer(
             and isinstance(s.rvalue, (ListExpr, TupleExpr))
         ):
             self.add_exports(s.rvalue.items)
-
-    def process__deletable__(self, s: AssignmentStmt) -> None:
-        if not self.options.mypyc:
-            return
-        if (
-            len(s.lvalues) == 1
-            and isinstance(s.lvalues[0], NameExpr)
-            and s.lvalues[0].name == "__deletable__"
-            and s.lvalues[0].kind == MDEF
-        ):
-            rvalue = s.rvalue
-            if not isinstance(rvalue, (ListExpr, TupleExpr)):
-                self.fail('"__deletable__" must be initialized with a list or tuple expression', s)
-                return
-            items = rvalue.items
-            attrs = []
-            for item in items:
-                if not isinstance(item, StrExpr):
-                    self.fail('Invalid "__deletable__" item; string literal expected', item)
-                else:
-                    attrs.append(item.value)
-            assert self.type
-            self.type.deletable_attributes = attrs
 
     def process__slots__(self, s: AssignmentStmt) -> None:
         """

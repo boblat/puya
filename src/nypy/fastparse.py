@@ -202,21 +202,13 @@ def parse(
     fnam: str,
     module: str | None,
     errors: Errors,
-    options: Options | None = None,
+    options: Options,
 ) -> MypyFile:
     """Parse a source file, without doing any semantic analysis.
 
     Return the parse tree. If errors is not provided, raise ParseError
     on failure. Otherwise, use the errors object to report parse errors.
     """
-    ignore_errors = (options is not None and options.ignore_errors) or (
-        fnam in errors.ignored_files
-    )
-    # If errors are ignored, we can drop many function bodies to speed up type checking.
-    strip_function_bodies = ignore_errors and (options is None or not options.preserve_asts)
-
-    if options is None:
-        options = Options()
     errors.set_file(fnam, module, options=options)
     is_stub_file = fnam.endswith(".pyi")
     if is_stub_file:
@@ -236,7 +228,7 @@ def parse(
             options=options,
             is_stub=is_stub_file,
             errors=errors,
-            strip_function_bodies=strip_function_bodies,
+            strip_function_bodies=False,
             path=fnam,
         ).visit(ast)
     except SyntaxError as e:

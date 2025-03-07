@@ -835,10 +835,7 @@ def compute_search_paths(
         # to the lib_path
         # TODO: Don't do this in some cases; for motivation see see
         # https://github.com/python/mypy/issues/4195#issuecomment-341915031
-        if options.bazel:
-            dir = "."
-        else:
-            dir = os.getcwd()
+        dir = os.getcwd()
         if dir not in lib_path:
             python_path.insert(0, dir)
 

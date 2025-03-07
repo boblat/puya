@@ -127,12 +127,7 @@ def get_mypy_options() -> nypy.options.Options:
     # set python_executable so third-party packages can be found
     mypy_opts.python_executable = _get_python_executable()
 
-    mypy_opts.preserve_asts = True
     mypy_opts.include_docstrings = True
-    # next two options disable caching entirely.
-    # slows things down but prevents intermittent failures.
-    mypy_opts.incremental = False
-    mypy_opts.cache_dir = os.devnull
 
     # strict mode flags, need to review these and all others too
     mypy_opts.disallow_any_generics = True

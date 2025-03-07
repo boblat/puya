@@ -1934,9 +1934,8 @@ class TypeChecker(NodeVisitor[None], CheckerPluginInterface):
             if isinstance(tvar, TypeVarType) and tvar.values:
                 subst.append([(tvar.id, value) for value in tvar.values])
         # Make a copy of the function to check for each combination of
-        # value restricted type variables. (Except when running mypyc,
-        # where we need one canonical version of the function.)
-        if subst and not (self.options.mypyc or self.options.inspections):
+        # value restricted type variables.
+        if subst and not self.options.inspections:
             result: list[tuple[FuncItem, CallableType]] = []
             for substitutions in itertools.product(*subst):
                 mapping = dict(substitutions)

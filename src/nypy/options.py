@@ -270,36 +270,10 @@ class Options:
 
         self.junit_format: str = "global"  # global|per_file
 
-        # Caching and incremental checking options
-        self.incremental = True
-        self.cache_dir = defaults.CACHE_DIR
-        self.sqlite_cache = False
-        self.debug_cache = False
-        self.skip_version_check = False
-        self.skip_cache_mtime_checks = False
-        self.fine_grained_incremental = False
-        # Include fine-grained dependencies in written cache files
-        self.cache_fine_grained = False
-        # Read cache files in fine-grained incremental mode (cache must include dependencies)
-        self.use_fine_grained_cache = False
-
-        # Run tree.serialize() even if cache generation is disabled
-        self.debug_serialize = False
-
-        # Tune certain behaviors when being used as a front-end to mypyc. Set per-module
-        # in modules being compiled. Not in the config file or command line.
-        self.mypyc = False
-
         # An internal flag to modify some type-checking logic while
         # running inspections (e.g. don't expand function definitions).
         # Not in the config file or command line.
         self.inspections = False
-
-        # Disable the memory optimization of freeing ASTs when
-        # possible. This isn't exposed as a command line option
-        # because it is intended for software integrating with
-        # mypy. (Like mypyc.)
-        self.preserve_asts = False
 
         # If True, function and class docstrings will be extracted and retained.
         # This isn't exposed as a command line option
@@ -351,8 +325,6 @@ class Options:
         self.logical_deps = False
         # If True, partial types can't span a module top level and a function
         self.local_partial_types = False
-        # Some behaviors are changed when using Bazel (https://bazel.build).
-        self.bazel = False
         # If True, export inferred types for all expressions as BuildResult.types
         self.export_types = False
         # List of package roots -- directories under these are packages even
@@ -383,9 +355,6 @@ class Options:
         self.old_type_inference = False
         # Deprecated reverse version of the above, do not use.
         self.new_type_inference = False
-        # Export line-level, limited, fine-grained dependency information in cache data
-        # (undocumented feature).
-        self.export_ref_info = False
 
         self.disable_bytearray_promotion = False
         self.disable_memoryview_promotion = False
