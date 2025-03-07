@@ -2,7 +2,7 @@ import abc
 import typing
 from collections.abc import Sequence
 
-import nypy.nodes
+import puyapy.arg_kind
 from puya.awst.nodes import (
     BoxValueExpression,
     ExpressionStatement,
@@ -36,7 +36,7 @@ class BoxGetExpressionBuilder(_BoxKeyExpressionIntermediateExpressionBuilder):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -55,7 +55,7 @@ class BoxMaybeExpressionBuilder(_BoxKeyExpressionIntermediateExpressionBuilder):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:

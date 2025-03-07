@@ -1,7 +1,7 @@
 import typing
 from collections.abc import Sequence
 
-import nypy.nodes
+import puyapy.arg_kind
 from puya.awst.nodes import Expression, VoidConstant
 from puya.errors import CodeError
 from puya.parse import SourceLocation
@@ -20,7 +20,7 @@ class NoneTypeBuilder(TypeBuilder):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:

@@ -1,7 +1,7 @@
 import typing
 from collections.abc import Sequence
 
-import nypy.nodes
+import puyapy.arg_kind
 from puya import log
 from puya.awst.nodes import (
     CallArg,
@@ -36,7 +36,7 @@ class SubroutineInvokerExpressionBuilder(FunctionBuilder):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -62,15 +62,15 @@ class SubroutineInvokerExpressionBuilder(FunctionBuilder):
                 raise InternalError("argument marked as named has no name", location)
             arg_map_name = typ_arg.name or str(idx)
             match typ_arg.kind:
-                case nypy.nodes.ArgKind.ARG_POS:
+                case puyapy.arg_kind.ArgKind.ARG_POS:
                     required_positional_names.append(arg_map_name)
-                case nypy.nodes.ArgKind.ARG_OPT:
+                case puyapy.arg_kind.ArgKind.ARG_OPT:
                     optional_positional_names.append(arg_map_name)
-                case nypy.nodes.ArgKind.ARG_NAMED:
+                case puyapy.arg_kind.ArgKind.ARG_NAMED:
                     required_kw_only.append(arg_map_name)
-                case nypy.nodes.ArgKind.ARG_NAMED_OPT:
+                case puyapy.arg_kind.ArgKind.ARG_NAMED_OPT:
                     optional_kw_only.append(arg_map_name)
-                case nypy.nodes.ArgKind.ARG_STAR | nypy.nodes.ArgKind.ARG_STAR2:
+                case puyapy.arg_kind.ArgKind.ARG_STAR | puyapy.arg_kind.ArgKind.ARG_STAR2:
                     logger.error(
                         "functions with variadic arguments are not supported", location=location
                     )

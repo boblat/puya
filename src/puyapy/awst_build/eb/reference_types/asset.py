@@ -1,7 +1,7 @@
 import typing
 from collections.abc import Sequence
 
-import nypy.nodes
+import puyapy.arg_kind
 from puya import log
 from puya.awst import wtypes
 from puya.awst.nodes import (
@@ -50,7 +50,7 @@ class AssetTypeBuilder(TypeBuilder[pytypes.RuntimeType]):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -85,7 +85,7 @@ class AssetHoldingExpressionBuilder(FunctionBuilder):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:

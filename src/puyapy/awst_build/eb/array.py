@@ -2,7 +2,7 @@ import abc
 import typing
 from collections.abc import Sequence
 
-import nypy.nodes
+import puyapy.arg_kind
 from puya import log
 from puya.awst import wtypes
 from puya.awst.nodes import (
@@ -48,7 +48,7 @@ class ArrayGenericTypeBuilder(GenericTypeBuilder):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -74,7 +74,7 @@ class ArrayTypeBuilder(TypeBuilder[pytypes.ArrayType]):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -171,7 +171,7 @@ class _Append(_ArrayFunc):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -188,7 +188,7 @@ class _Pop(_ArrayFunc):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -202,7 +202,7 @@ class _Extend(_ArrayFunc):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -221,7 +221,7 @@ class _Freeze(_ArrayFunc):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:

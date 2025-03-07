@@ -8,6 +8,7 @@ import nypy.nodes
 import nypy.patterns
 import nypy.types
 import nypy.visitor
+import puyapy.arg_kind
 from puya import log
 from puya.awst.nodes import (
     AppStateExpression,
@@ -1244,7 +1245,7 @@ class FunctionASTConverter(
                         if not has_error:
                             case_value_builder = class_builder.call(
                                 args=cls_args,
-                                arg_kinds=[nypy.nodes.ArgKind.ARG_POS] * len(cls_args),
+                                arg_kinds=[puyapy.arg_kind.ArgKind.ARG_POS] * len(cls_args),
                                 arg_names=[None] * len(cls_args),
                                 location=pattern_loc,
                             )

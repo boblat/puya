@@ -1,7 +1,7 @@
 import typing
 from collections.abc import Mapping, Sequence
 
-import nypy.nodes
+import puyapy.arg_kind
 from puya.awst.nodes import CompiledContract, CompiledLogicSig, Expression
 from puya.awst.txn_fields import TxnField
 from puya.log import get_logger
@@ -54,7 +54,7 @@ class CompileContractFunctionBuilder(FunctionBuilder):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
@@ -107,7 +107,7 @@ class CompileLogicSigFunctionBuilder(FunctionBuilder):
     def call(
         self,
         args: Sequence[NodeBuilder],
-        arg_kinds: list[nypy.nodes.ArgKind],
+        arg_kinds: list[puyapy.arg_kind.ArgKind],
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
