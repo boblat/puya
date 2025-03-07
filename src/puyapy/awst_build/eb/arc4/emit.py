@@ -57,7 +57,7 @@ class EmitBuilder(FunctionBuilder):
                 event_arg_eb = ARC4StructTypeBuilder(struct_type, location).call(
                     args=arc4_args,
                     arg_names=[None] * len(arc4_args),
-                    arg_kinds=[nypy.nodes.ARG_POS] * len(arc4_args),
+                    arg_kinds=[nypy.nodes.ArgKind.ARG_POS] * len(arc4_args),
                     location=location,
                 )
         event_name = struct_type.name.split(".")[-1]

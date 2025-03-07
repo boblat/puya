@@ -198,7 +198,7 @@ def _implicit_arc4_conversion(
         return target_type_builder.call(
             args=conversion_args,
             arg_names=[None] * len(conversion_args),
-            arg_kinds=[nypy.nodes.ARG_POS] * len(conversion_args),
+            arg_kinds=[nypy.nodes.ArgKind.ARG_POS] * len(conversion_args),
             location=instance.source_location,
         )
     encoded = awst_nodes.ARC4Encode(
