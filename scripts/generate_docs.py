@@ -9,8 +9,7 @@ import attrs
 import nypy.build
 import nypy.nodes
 from nypy.visitor import NodeVisitor
-from puyapy.compile import get_mypy_options
-from puyapy.parse import parse_and_typecheck
+from puyapy.parse import get_mypy_options, parse_and_typecheck
 
 SCRIPTS_DIR = Path(__file__).parent
 VCS_ROOT = SCRIPTS_DIR.parent

@@ -1,15 +1,7 @@
-import os
-import shutil
-import subprocess
-import sysconfig
 from collections.abc import Callable, Mapping, Sequence
-from importlib import metadata
 from pathlib import Path
 
-from packaging import version
-
 import nypy.errors
-import nypy.options
 from puya import log
 from puya.arc56 import create_arc56_json
 from puya.awst.nodes import AWST
@@ -24,12 +16,10 @@ from puyapy.awst_build.arc4_client_gen import write_arc4_client
 from puyapy.awst_build.main import transform_ast
 from puyapy.client_gen import parse_arc56
 from puyapy.options import PuyaPyOptions
-from puyapy.parse import TYPESHED_PATH, ParseResult, parse_and_typecheck
+from puyapy.parse import parse_with_mypy
 
 # this should contain the lowest version number that this compiler does NOT support
 # i.e. the next minor version after what is defined in stubs/pyproject.toml:tool.poetry.version
-MAX_SUPPORTED_ALGOPY_VERSION_EX = version.parse("2.8.0")
-MIN_SUPPORTED_ALGOPY_VERSION = version.parse(f"{MAX_SUPPORTED_ALGOPY_VERSION_EX.major}.0.0")
 
 logger = log.get_logger(__name__)
 
@@ -99,131 +89,6 @@ def write_arc4_clients(
                 # Puya ARC4Contract
                 contract = parse_arc56(app_spec_json)
                 write_arc4_client(contract, contract_out_dir)
-
-
-def parse_with_mypy(paths: Sequence[Path]) -> ParseResult:
-    mypy_options = get_mypy_options()
-
-    _, ordered_modules = parse_and_typecheck(paths, mypy_options)
-    return ParseResult(
-        mypy_options=mypy_options,
-        ordered_modules=ordered_modules,
-    )
-
-
-def get_mypy_options() -> nypy.options.Options:
-    mypy_opts = nypy.options.Options()
-
-    # improve mypy parsing performance by using a cut-down typeshed
-    mypy_opts.custom_typeshed_dir = str(TYPESHED_PATH)
-    mypy_opts.abs_custom_typeshed_dir = str(TYPESHED_PATH.resolve())
-
-    # set python_executable so third-party packages can be found
-    mypy_opts.python_executable = _get_python_executable()
-
-    mypy_opts.include_docstrings = True
-
-    # strict mode flags, need to review these and all others too
-    mypy_opts.disallow_any_generics = True
-    mypy_opts.disallow_subclassing_any = True
-    mypy_opts.disallow_untyped_calls = True
-    mypy_opts.disallow_untyped_defs = True
-    mypy_opts.disallow_incomplete_defs = True
-    mypy_opts.check_untyped_defs = True
-    mypy_opts.disallow_untyped_decorators = True
-    mypy_opts.warn_redundant_casts = True
-    mypy_opts.warn_unused_ignores = True
-    mypy_opts.warn_return_any = True
-    mypy_opts.strict_equality = True
-    mypy_opts.strict_concatenate = True
-
-    # disallow use of any
-    mypy_opts.disallow_any_unimported = True
-    mypy_opts.disallow_any_expr = False  # this is broken for tuples
-    mypy_opts.disallow_any_decorated = True
-    mypy_opts.disallow_any_explicit = True
-
-    mypy_opts.pretty = True  # show source in output
-
-    return mypy_opts
-
-
-def _get_python_executable() -> str | None:
-    prefix = _get_prefix()
-    if not prefix:
-        logger.warning("could not determine python prefix or algopy version")
-        return None
-    logger.info(f"found python prefix: {prefix}")
-    install_paths = sysconfig.get_paths(vars={"base": prefix})
-
-    python_exe = None
-    for python in ("python3", "python"):
-        python_exe = shutil.which(python, path=install_paths["scripts"])
-        if python_exe:
-            logger.debug(f"using python executable: {python_exe}")
-            break
-    else:
-        logger.warning("found a python prefix, but could not find the expected python interpreter")
-    # use glob here, as we don't want to assume the python version
-    discovered_site_packages = list(
-        Path(prefix).glob(str(Path("[Ll]ib") / "**" / "site-packages"))
-    )
-    try:
-        (site_packages,) = discovered_site_packages
-    except ValueError:
-        logger.warning(
-            "found a prefix, but could not find the expected"
-            f" site-packages: {prefix=}, {discovered_site_packages=}"
-        )
-    else:
-        logger.debug(f"using python site-packages: {site_packages}")
-        _check_algopy_version(site_packages)
-
-    return python_exe
-
-
-def _get_prefix() -> str | None:
-    # look for VIRTUAL_ENV as we want the venv puyapy is being run against (i.e. the project),
-    # if no venv is active, then fallback to the ambient python prefix
-    venv = os.getenv("VIRTUAL_ENV")
-    if venv:
-        return venv
-    for python in ("python3", "python"):
-        prefix_result = subprocess.run(  # noqa: S602
-            f"{python} -c 'import sys; print(sys.prefix or sys.base_prefix)'",
-            shell=True,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        if prefix_result.returncode == 0 and (maybe_prefix := prefix_result.stdout.strip()):
-            return maybe_prefix
-    return None
-
-
-_STUBS_PACKAGE_NAME = "algorand-python"
-
-
-def _check_algopy_version(site_packages: Path) -> None:
-    pkgs = metadata.Distribution.discover(name=_STUBS_PACKAGE_NAME, path=[str(site_packages)])
-    try:
-        (algopy,) = pkgs
-    except ValueError:
-        logger.warning("Could not determine algopy version")
-        return
-    algopy_version = version.parse(algopy.version)
-    logger.debug(f"found algopy: {algopy_version}")
-
-    if not (MIN_SUPPORTED_ALGOPY_VERSION <= algopy_version < MAX_SUPPORTED_ALGOPY_VERSION_EX):
-        logger.warning(
-            f"{_STUBS_PACKAGE_NAME} version {algopy_version} is outside the supported range:"
-            f" >={MIN_SUPPORTED_ALGOPY_VERSION}, <{MAX_SUPPORTED_ALGOPY_VERSION_EX}",
-            important=True,
-            related_lines=[
-                "This will cause typing errors if there are incompatibilities in the API used.",
-                "Please update your algorand-python package to be in the supported range.",
-            ],
-        )
 
 
 def output_awst(awst: AWST, awst_out_dir: Path) -> None:

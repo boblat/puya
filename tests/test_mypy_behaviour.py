@@ -13,7 +13,7 @@ import nypy.types
 import pytest
 from nypy.nodes import RevealExpr
 
-from puyapy.compile import get_mypy_options
+from puyapy.parse import get_mypy_options
 
 
 def get_assignment_var_named(mypy_file: nypy.nodes.MypyFile, name: str) -> nypy.nodes.Var:

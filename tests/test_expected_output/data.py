@@ -16,8 +16,8 @@ from puya.errors import PuyaError, log_exceptions
 from puya.log import Log, LogLevel, logging_context
 from puya.utils import coalesce
 from puyapy.awst_build.main import transform_ast
-from puyapy.compile import parse_with_mypy
 from puyapy.options import PuyaPyOptions
+from puyapy.parse import parse_with_mypy
 from puyapy.template import parse_template_key_value
 from tests.utils import narrowed_parse_result
 

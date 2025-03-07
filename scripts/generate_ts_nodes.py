@@ -13,8 +13,7 @@ import mypy.util
 from mypy.options import NEW_GENERIC_SYNTAX
 
 from puya import log
-from puyapy.compile import _get_python_executable
-from puyapy.parse import _parse_log_message
+from puyapy.parse import _get_python_executable, _parse_log_message
 
 logger = log.get_logger(__name__)
 
