@@ -20,11 +20,10 @@ import json
 import os
 import platform
 import re
-import stat
 import sys
 import time
 import types
-from collections.abc import Iterator, Mapping, Sequence, Set as AbstractSet
+from collections.abc import Iterator, Sequence, Set as AbstractSet
 from typing import (
     Any,
     Callable,
@@ -43,7 +42,7 @@ from nypy import errorcodes as codes
 from nypy.checker import TypeChecker
 from nypy.config_parser import parse_mypy_comments
 from nypy.error_formatter import OUTPUT_CHOICES, ErrorFormatter
-from nypy.errors import CompileError, ErrorInfo, Errors, report_internal_error
+from nypy.errors import CompileError, ErrorInfo, Errors
 from nypy.fixup import fixup_module
 from nypy.fscache import FileSystemCache
 from nypy.graph_utils import prepare_sccs, strongly_connected_components, topsort
@@ -68,7 +67,6 @@ from nypy.plugins.default import DefaultPlugin
 from nypy.renaming import LimitedVariableRenameVisitor, VariableRenameVisitor
 from nypy.semanal import SemanticAnalyzer
 from nypy.semanal_pass1 import SemanticAnalyzerPreAnalysis
-from nypy.stats import dump_type_stats
 from nypy.stubinfo import is_module_from_legacy_bundled_package, stub_distribution_name
 from nypy.types import Type
 from nypy.typestate import reset_global_state, type_state
@@ -82,15 +80,9 @@ from nypy.util import (
     is_typeshed_file,
     read_py_file,
     time_ref,
-    time_spent_us,
 )
 from nypy.version import __version__
 
-# Switch to True to produce debug output related to fine-grained incremental
-# mode only that is useful during development. This produces only a subset of
-# output compared to --verbose output. We use a global flag to enable this so
-# that it's easy to enable this when running tests.
-DEBUG_FINE_GRAINED: Final = False
 
 # These modules are special and should always come from typeshed.
 CORE_BUILTIN_MODULES: Final = {
@@ -222,30 +214,11 @@ def _build(
         stdout=sys.stdout,
         stderr=sys.stderr,
     )
-    if manager.verbosity() >= 2:
-        manager.trace(repr(options))
 
     reset_global_state()
-    try:
-        graph = dispatch(sources, manager, sys.stdout)
-        type_state.reset_all_subtype_caches()
-        if options.timing_stats is not None:
-            dump_timing_stats(options.timing_stats, graph)
-        if options.line_checking_stats is not None:
-            dump_line_checking_stats(options.line_checking_stats, graph)
-        return BuildResult(manager, graph)
-    finally:
-        t0 = time.time()
-        manager.add_stats(cache_commit_time=time.time() - t0)
-        manager.log(
-            "Build finished in %.3f seconds with %d modules, and %d errors"
-            % (
-                time.time() - manager.start_time,
-                len(manager.modules),
-                manager.errors.num_messages(),
-            )
-        )
-        manager.dump_stats()
+    graph = dispatch(sources, manager, sys.stdout)
+    type_state.reset_all_subtype_caches()
+    return BuildResult(manager, graph)
 
 
 def default_data_dir() -> str:
@@ -558,7 +531,6 @@ class BuildManager:
         stderr: TextIO,
         error_formatter: ErrorFormatter | None = None,
     ) -> None:
-        self.stats: dict[str, Any] = {}  # Values are ints or floats
         self.stdout = stdout
         self.stderr = stderr
         self.start_time = time.time()
@@ -632,12 +604,6 @@ class BuildManager:
         # new file can be processed O(n**2) times. This cache
         # avoids most of this redundant work.
         self.ast_cache: dict[str, tuple[MypyFile, list[ErrorInfo]]] = {}
-
-    def dump_stats(self) -> None:
-        if self.options.dump_build_stats:
-            print("Stats:")
-            for key, value in sorted(self.stats_summary().items()):
-                print(f"{key + ':':24}{value}")
 
     def maybe_swap_for_shadow_path(self, path: str) -> str:
         if not self.shadow_map:
@@ -750,58 +716,12 @@ class BuildManager:
             self.errors.ignored_files.add(path)
         tree = parse(source, path, id, self.errors, options=options)
         tree._fullname = id
-        self.add_stats(
-            files_parsed=1,
-            modules_parsed=int(not tree.is_stub),
-            stubs_parsed=int(tree.is_stub),
-            parse_time=time.time() - t0,
-        )
 
         if self.errors.is_blockers():
-            self.log("Bailing due to parse errors")
             self.errors.raise_error()
 
         self.errors.set_file_ignored_lines(path, tree.ignored_lines, ignore_errors)
         return tree
-
-    def verbosity(self) -> int:
-        return self.options.verbosity
-
-    def log(self, *message: str) -> None:
-        if self.verbosity() >= 1:
-            if message:
-                print("LOG: ", *message, file=self.stderr)
-            else:
-                print(file=self.stderr)
-            self.stderr.flush()
-
-    def log_fine_grained(self, *message: str) -> None:
-        import nypy.build
-
-        if self.verbosity() >= 1:
-            self.log("fine-grained:", *message)
-        elif nypy.build.DEBUG_FINE_GRAINED:
-            # Output log in a simplified format that is quick to browse.
-            if message:
-                print(*message, file=self.stderr)
-            else:
-                print(file=self.stderr)
-            self.stderr.flush()
-
-    def trace(self, *message: str) -> None:
-        if self.verbosity() >= 2:
-            print("TRACE:", *message, file=self.stderr)
-            self.stderr.flush()
-
-    def add_stats(self, **kwds: Any) -> None:
-        for key, value in kwds.items():
-            if key in self.stats:
-                self.stats[key] += value
-            else:
-                self.stats[key] = value
-
-    def stats_summary(self) -> Mapping[str, object]:
-        return self.stats
 
 
 def compute_hash(text: str) -> str:
@@ -1024,13 +944,6 @@ class State:
 
     fine_grained_deps_loaded = False
 
-    # Cumulative time spent on this file, in microseconds (for profiling stats)
-    time_spent_us: int = 0
-
-    # Per-line type-checking time (cumulative time spent type-checking expressions
-    # on a given source code line).
-    per_line_checking_time_ns: dict[int, int]
-
     def __init__(
         self,
         id: str | None,
@@ -1092,9 +1005,6 @@ class State:
             source = ""
         self.source = source
         self.add_ancestors()
-        self.per_line_checking_time_ns = collections.defaultdict(int)
-        t0 = time.time()
-        self.manager.add_stats(validate_meta_time=time.time() - t0)
         if self.meta:
             # Make copies, since we may modify these and want to
             # compare them to the originals later.
@@ -1170,7 +1080,6 @@ class State:
     def check_blockers(self) -> None:
         """Raise CompileError if a blocking error is detected."""
         if self.manager.errors.is_blockers():
-            self.manager.log("Bailing due to blocking errors")
             self.manager.errors.raise_error()
 
     @contextlib.contextmanager
@@ -1186,20 +1095,7 @@ class State:
         """
         save_import_context = self.manager.errors.import_context()
         self.manager.errors.set_import_context(self.import_context)
-        try:
-            yield
-        except CompileError:
-            raise
-        except Exception as err:
-            report_internal_error(
-                err,
-                self.path,
-                0,
-                self.manager.errors,
-                self.options,
-                self.manager.stdout,
-                self.manager.stderr,
-            )
+        yield
         self.manager.errors.set_import_context(save_import_context)
         # TODO: Move this away once we've removed the old semantic analyzer?
         if check_blockers:
@@ -1231,12 +1127,6 @@ class State:
         # Can we reuse a previously parsed AST? This avoids redundant work in daemon.
         cached = self.id in manager.ast_cache
         modules = manager.modules
-        if not cached:
-            manager.log(f"Parsing {self.xpath} ({self.id})")
-        else:
-            manager.log(f"Using cached AST for {self.xpath} ({self.id})")
-
-        t0 = time_ref()
 
         with self.wrap_context():
             source = self.source
@@ -1292,8 +1182,6 @@ class State:
                     self.tree.ignored_lines,
                     self.ignore_all or self.options.ignore_errors,
                 )
-
-        self.time_spent_us += time_spent_us(t0)
 
         if not cached:
             # Make a copy of any errors produced during parse time so that
@@ -1353,7 +1241,6 @@ class State:
             if options.allow_redefinition:
                 # Perform more renaming across the AST to allow variable redefinitions
                 self.tree.accept(VariableRenameVisitor())
-        self.time_spent_us += time_spent_us(t0)
 
     def add_dependency(self, dep: str) -> None:
         if dep not in self.dependencies_set:
@@ -1412,10 +1299,8 @@ class State:
     def type_check_first_pass(self) -> None:
         if self.options.semantic_analysis_only:
             return
-        t0 = time_ref()
         with self.wrap_context():
             self.type_checker().check_first_pass()
-        self.time_spent_us += time_spent_us(t0)
 
     def type_checker(self) -> TypeChecker:
         if not self._type_checker:
@@ -1428,7 +1313,6 @@ class State:
                 self.tree,
                 self.xpath,
                 manager.plugin,
-                self.per_line_checking_time_ns,
             )
         return self._type_checker
 
@@ -1441,10 +1325,8 @@ class State:
     def type_check_second_pass(self) -> bool:
         if self.options.semantic_analysis_only:
             return False
-        t0 = time_ref()
         with self.wrap_context():
             result = self.type_checker().check_second_pass()
-        self.time_spent_us += time_spent_us(t0)
         return result
 
     def detect_possibly_undefined_vars(self) -> None:
@@ -1495,18 +1377,7 @@ class State:
                     if sym.node.tuple_type:
                         all_types.append(sym.node.tuple_type)
             self._patch_indirect_dependencies(self.type_checker().module_refs, all_types)
-
-            if self.options.dump_inference_stats:
-                dump_type_stats(
-                    self.tree,
-                    self.xpath,
-                    modules=self.manager.modules,
-                    inferred=True,
-                    typemap=self.type_map(),
-                )
-
             self.free_state()
-        self.time_spent_us += time_spent_us(t0)
 
     def free_state(self) -> None:
         if self._type_checker:
@@ -1661,12 +1532,8 @@ def find_module_and_diagnose(
         if skip_diagnose:
             pass
         elif follow_imports == "silent":
-            # Still import it, but silence non-blocker errors.
-            manager.log(f"Silencing {result} ({id})")
+            pass
         elif follow_imports == "skip" or follow_imports == "error":
-            # In 'error' mode, produce special error messages.
-            if id not in manager.missing_modules:
-                manager.log(f"Skipping {result} ({id})")
             if follow_imports == "error":
                 if ancestor_for:
                     skipping_ancestor(manager, id, result, ancestor_for)
@@ -1737,9 +1604,7 @@ def exist_added_packages(suppressed: list[str], manager: BuildManager, options: 
 
 def find_module_simple(id: str, manager: BuildManager) -> str | None:
     """Find a filesystem path for module `id` or `None` if not found."""
-    t0 = time.time()
     x = manager.find_module_cache.find_module(id, fast_path=True)
-    manager.add_stats(find_module_time=time.time() - t0, find_module_calls=1)
     if isinstance(x, ModuleNotFoundReason):
         return None
     return x
@@ -1747,10 +1612,7 @@ def find_module_simple(id: str, manager: BuildManager) -> str | None:
 
 def find_module_with_reason(id: str, manager: BuildManager) -> ModuleSearchResult:
     """Find a filesystem path for module `id` or the reason it can't be found."""
-    t0 = time.time()
-    x = manager.find_module_cache.find_module(id, fast_path=False)
-    manager.add_stats(find_module_time=time.time() - t0, find_module_calls=1)
-    return x
+    return manager.find_module_cache.find_module(id, fast_path=False)
 
 
 def in_partial_package(id: str, manager: BuildManager) -> bool:
@@ -1860,62 +1722,13 @@ def skipping_ancestor(manager: BuildManager, id: str, path: str, ancestor_for: S
     )
 
 
-def log_configuration(manager: BuildManager, sources: list[BuildSource]) -> None:
-    """Output useful configuration information to LOG and TRACE"""
-
-    config_file = manager.options.config_file
-    if config_file:
-        config_file = os.path.abspath(config_file)
-
-    manager.log()
-    configuration_vars = [
-        ("Mypy Version", __version__),
-        ("Config File", (config_file or "Default")),
-        ("Configured Executable", manager.options.python_executable or "None"),
-        ("Current Executable", sys.executable),
-        ("Cache Dir", os.devnull),
-        ("Compiled", str(not __file__.endswith(".py"))),
-        ("Exclude", manager.options.exclude),
-    ]
-
-    for conf_name, conf_value in configuration_vars:
-        manager.log(f"{conf_name + ':':24}{conf_value}")
-
-    for source in sources:
-        manager.log(f"{'Found source:':24}{source}")
-
-    # Complete list of searched paths can get very long, put them under TRACE
-    for path_type, paths in manager.search_paths.asdict().items():
-        if not paths:
-            manager.trace(f"No {path_type}")
-            continue
-
-        manager.trace(f"{path_type}:")
-
-        for pth in paths:
-            manager.trace(f"    {pth}")
-
-
 # The driver
-
-
 def dispatch(sources: list[BuildSource], manager: BuildManager, stdout: TextIO) -> Graph:
-    log_configuration(manager, sources)
-
-    t0 = time.time()
     graph = load_graph(sources, manager)
 
-    t1 = time.time()
-    manager.add_stats(
-        graph_size=len(graph),
-        stubs_found=sum(g.path is not None and g.path.endswith(".pyi") for g in graph.values()),
-        graph_load_time=(t1 - t0),
-        fm_cache_size=len(manager.find_module_cache.results),
-    )
     if not graph:
         print("Nothing to do?!", file=stdout)
         return graph
-    manager.log(f"Loaded graph with {len(graph)} nodes ({t1 - t0:.3f} sec)")
     if manager.options.dump_graph:
         dump_graph(graph, stdout)
         return graph
@@ -1924,7 +1737,6 @@ def dispatch(sources: list[BuildSource], manager: BuildManager, stdout: TextIO) 
     # don't want to do a real incremental reprocess of the
     # graph---we'll handle it all later.
     process_graph(graph, manager)
-    # Update plugins snapshot.
 
     if manager.options.dump_deps:
         # This speeds up startup a little when not using the daemon mode.
@@ -1956,25 +1768,6 @@ class NodeInfo:
             json.dumps(self.sizes),
             json.dumps(self.deps),
         )
-
-
-def dump_timing_stats(path: str, graph: Graph) -> None:
-    """Dump timing stats for each file in the given graph."""
-    with open(path, "w") as f:
-        for id in sorted(graph):
-            f.write(f"{id} {graph[id].time_spent_us}\n")
-
-
-def dump_line_checking_stats(path: str, graph: Graph) -> None:
-    """Dump per-line expression type checking stats."""
-    with open(path, "w") as f:
-        for id in sorted(graph):
-            if not graph[id].per_line_checking_time_ns:
-                continue
-            f.write(f"{id}:\n")
-            for line in sorted(graph[id].per_line_checking_time_ns):
-                line_time = graph[id].per_line_checking_time_ns[line]
-                f.write(f"{line:>5} {line_time/1000:8.1f}\n")
 
 
 def dump_graph(graph: Graph, stdout: TextIO | None = None) -> None:
@@ -2175,7 +1968,6 @@ def load_graph(
 def process_graph(graph: Graph, manager: BuildManager) -> None:
     """Process everything in dependency order."""
     sccs = sorted_components(graph)
-    manager.log("Found %d SCCs; largest has %d nodes" % (len(sccs), max(len(scc) for scc in sccs)))
 
     fresh_scc_queue: list[list[str]] = []
 
@@ -2198,16 +1990,6 @@ def process_graph(graph: Graph, manager: BuildManager) -> None:
             # some builtin objects will be incompletely processed.)
             scc.remove("builtins")
             scc.append("builtins")
-        if manager.options.verbosity >= 2:
-            for id in scc:
-                manager.trace(
-                    f"Priorities for {id}:",
-                    " ".join(
-                        "%s:%d" % (x, graph[id].priorities[x])
-                        for x in graph[id].dependencies
-                        if x in ascc and x in graph[id].priorities
-                    ),
-                )
         # Because the SCCs are presented in topological sort order, we
         # don't need to look at dependencies recursively for staleness
         # -- the immediate dependencies are sufficient.
@@ -2237,37 +2019,18 @@ def process_graph(graph: Graph, manager: BuildManager) -> None:
             newest_in_deps = (
                 0 if not viable else max(graph[dep].xmeta.data_mtime for dep in viable)
             )
-            if manager.options.verbosity >= 3:  # Dump all mtimes for extreme debugging.
-                all_ids = sorted(ascc | viable, key=lambda id: graph[id].xmeta.data_mtime)
-                for id in all_ids:
-                    if id in scc:
-                        if graph[id].xmeta.data_mtime < newest_in_deps:
-                            key = "*id:"
-                        else:
-                            key = "id:"
-                    else:
-                        if graph[id].xmeta.data_mtime > oldest_in_scc:
-                            key = "+dep:"
-                        else:
-                            key = "dep:"
-                    manager.trace(" %5s %.0f %s" % (key, graph[id].xmeta.data_mtime, id))
             # If equal, give the benefit of the doubt, due to 1-sec time granularity
             # (on some platforms).
             if oldest_in_scc < newest_in_deps:
                 fresh = False
-                fresh_msg = f"out of date by {newest_in_deps - oldest_in_scc:.0f} seconds"
-            else:
-                fresh_msg = "fresh"
         elif undeps:
-            fresh_msg = f"stale due to changed suppression ({' '.join(sorted(undeps))})"
+            pass
         elif stale_scc:
             fresh_msg = "inherently stale"
             if stale_scc != ascc:
                 fresh_msg += f" ({' '.join(sorted(stale_scc))})"
             if stale_deps:
                 fresh_msg += f" with stale deps ({' '.join(sorted(stale_deps))})"
-        else:
-            fresh_msg = f"stale due to deps ({' '.join(sorted(stale_deps))})"
 
         # Initialize transitive_error for all SCC members from union
         # of transitive_error of dependencies.
@@ -2275,13 +2038,10 @@ def process_graph(graph: Graph, manager: BuildManager) -> None:
             for id in scc:
                 graph[id].transitive_error = True
 
-        scc_str = " ".join(scc)
         if fresh:
-            manager.trace(f"Queuing {fresh_msg} SCC ({scc_str})")
             fresh_scc_queue.append(scc)
         else:
             if fresh_scc_queue:
-                manager.log(f"Processing {len(fresh_scc_queue)} queued fresh SCCs")
                 # Defer processing fresh SCCs until we actually run into a stale SCC
                 # and need the earlier modules to be loaded.
                 #
@@ -2299,25 +2059,7 @@ def process_graph(graph: Graph, manager: BuildManager) -> None:
                 for prev_scc in fresh_scc_queue:
                     process_fresh_modules(graph, prev_scc, manager)
                 fresh_scc_queue = []
-            size = len(scc)
-            if size == 1:
-                manager.log(f"Processing SCC singleton ({scc_str}) as {fresh_msg}")
-            else:
-                manager.log("Processing SCC of size %d (%s) as %s" % (size, scc_str, fresh_msg))
             process_stale_scc(graph, scc, manager)
-
-    sccs_left = len(fresh_scc_queue)
-    nodes_left = sum(len(scc) for scc in fresh_scc_queue)
-    manager.add_stats(sccs_left=sccs_left, nodes_left=nodes_left)
-    if sccs_left:
-        manager.log(
-            "{} fresh SCCs ({} nodes) left in queue (and will remain unprocessed)".format(
-                sccs_left, nodes_left
-            )
-        )
-        manager.trace(str(fresh_scc_queue))
-    else:
-        manager.log("No fresh SCCs left in queue")
 
 
 def order_ascc(graph: Graph, ascc: AbstractSet[str], pri_max: int = PRI_ALL) -> list[str]:
@@ -2373,14 +2115,10 @@ def process_fresh_modules(graph: Graph, modules: list[str], manager: BuildManage
     This can be used to process an SCC of modules
     This involves loading the tree from JSON and then doing various cleanups.
     """
-    t0 = time.time()
     for id in modules:
         graph[id].load_tree()
-    t1 = time.time()
     for id in modules:
         graph[id].fix_cross_refs()
-    t2 = time.time()
-    manager.add_stats(process_fresh_time=t2 - t0, load_tree_time=t1 - t0)
 
 
 def process_stale_scc(graph: Graph, scc: list[str], manager: BuildManager) -> None:

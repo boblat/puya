@@ -23,7 +23,7 @@ from nypy.checkpattern import PatternChecker
 from nypy.constraints import SUPERTYPE_OF
 from nypy.erasetype import erase_type, erase_typevars, remove_instance_last_known_values
 from nypy.errorcodes import TYPE_VAR, UNUSED_AWAITABLE, UNUSED_COROUTINE, ErrorCode
-from nypy.errors import Errors, ErrorWatcher, report_internal_error
+from nypy.errors import Errors, ErrorWatcher
 from nypy.expandtype import expand_self_type, expand_type, expand_type_by_instance
 from nypy.literals import Key, extract_var_from_literal_hash, literal, literal_hash
 from nypy.maptype import map_instance_to_supertype
@@ -358,7 +358,6 @@ class TypeChecker(NodeVisitor[None], CheckerPluginInterface):
         tree: MypyFile,
         path: str,
         plugin: Plugin,
-        per_line_checking_time_ns: dict[int, int],
     ) -> None:
         """Construct a type checker.
 
@@ -409,9 +408,7 @@ class TypeChecker(NodeVisitor[None], CheckerPluginInterface):
         self.allow_abstract_call = False
 
         # Child checker objects for specific AST node types
-        self.expr_checker = nypy.checkexpr.ExpressionChecker(
-            self, self.msg, self.plugin, per_line_checking_time_ns
-        )
+        self.expr_checker = nypy.checkexpr.ExpressionChecker(self, self.msg, self.plugin)
         self.pattern_checker = PatternChecker(self, self.msg, self.plugin, options)
 
     @property
@@ -572,10 +569,7 @@ class TypeChecker(NodeVisitor[None], CheckerPluginInterface):
 
     def accept(self, stmt: Statement) -> None:
         """Type check a node in the given type context."""
-        try:
-            stmt.accept(self)
-        except Exception as err:
-            report_internal_error(err, self.errors.file, stmt.line, self.errors, self.options)
+        stmt.accept(self)
 
     def accept_loop(
         self,
@@ -6921,9 +6915,7 @@ class TypeChecker(NodeVisitor[None], CheckerPluginInterface):
         base = map_instance_to_supertype(typ, self.lookup_typeinfo("builtins.tuple"))
         arg = base.args[0]
         # Again, we are conservative about subclasses until we gain more confidence.
-        allow_precise = (
-            PRECISE_TUPLE_TYPES in self.options.enable_incomplete_feature
-        ) and typ.type.fullname == "builtins.tuple"
+        allow_precise = False and typ.type.fullname == "builtins.tuple"
         if op in ("==", "is"):
             # TODO: return fixed union + prefixed variadic tuple for no_type?
             return TupleType(items=[arg] * size, fallback=typ), typ

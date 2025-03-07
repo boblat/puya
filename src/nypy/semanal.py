@@ -58,7 +58,7 @@ from typing_extensions import TypeAlias as _TypeAlias, TypeGuard
 from nypy import errorcodes as codes, message_registry
 from nypy.constant_fold import constant_fold_expr
 from nypy.errorcodes import PROPERTY_DECORATOR, ErrorCode
-from nypy.errors import Errors, report_internal_error
+from nypy.errors import Errors
 from nypy.exprtotype import TypeTranslationError, expr_to_unanalyzed_type
 from nypy.message_registry import ErrorMessage
 from nypy.messages import (
@@ -7193,20 +7193,15 @@ class SemanticAnalyzer(
         self.errors.report(ctx.line, ctx.column, msg, severity="note", code=code)
 
     def incomplete_feature_enabled(self, feature: str, ctx: Context) -> bool:
-        if feature not in self.options.enable_incomplete_feature:
-            self.fail(
-                f'"{feature}" support is experimental,'
-                f" use --enable-incomplete-feature={feature} to enable",
-                ctx,
-            )
-            return False
-        return True
+        self.fail(
+            f'"{feature}" support is experimental,'
+            f" use --enable-incomplete-feature={feature} to enable",
+            ctx,
+        )
+        return False
 
     def accept(self, node: Node) -> None:
-        try:
-            node.accept(self)
-        except Exception as err:
-            report_internal_error(err, self.errors.file, node.line, self.errors, self.options)
+        node.accept(self)
 
     def expr_to_analyzed_type(
         self,

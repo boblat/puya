@@ -18,7 +18,7 @@ from nypy.argmap import ArgTypeExpander, map_actuals_to_formals, map_formals_to_
 from nypy.checkmember import analyze_member_access, freeze_all_type_vars, type_object_type
 from nypy.checkstrformat import StringFormatterChecker
 from nypy.erasetype import erase_type, remove_instance_last_known_values, replace_meta_vars
-from nypy.errors import ErrorWatcher, report_internal_error
+from nypy.errors import ErrorWatcher
 from nypy.expandtype import (
     expand_type,
     expand_type_by_instance,
@@ -318,14 +318,11 @@ class ExpressionChecker(ExpressionVisitor[Type]):
         chk: nypy.checker.TypeChecker,
         msg: MessageBuilder,
         plugin: Plugin,
-        per_line_checking_time_ns: dict[int, int],
     ) -> None:
         """Construct an expression type checker."""
         self.chk = chk
         self.msg = msg
         self.plugin = plugin
-        self.per_line_checking_time_ns = per_line_checking_time_ns
-        self.collect_line_checking_stats = chk.options.line_checking_stats is not None
         # Are we already visiting some expression? This is used to avoid double counting
         # time for nested expressions.
         self.in_expression = False
@@ -3433,23 +3430,6 @@ class ExpressionChecker(ExpressionVisitor[Type]):
                             or find_unpack_in_list(proper_right_type.items) is None
                         ):
                             return self.concat_tuples(proper_left_type, proper_right_type)
-                elif (
-                    PRECISE_TUPLE_TYPES in self.chk.options.enable_incomplete_feature
-                    and isinstance(proper_right_type, Instance)
-                    and self.chk.type_is_iterable(proper_right_type)
-                ):
-                    # Handle tuple[X, Y] + tuple[Z, ...] = tuple[X, Y, *tuple[Z, ...]].
-                    right_radd_method = proper_right_type.type.get("__radd__")
-                    if (
-                        right_radd_method is None
-                        and proper_left_type.partial_fallback.type.fullname == "builtins.tuple"
-                        and find_unpack_in_list(proper_left_type.items) is None
-                    ):
-                        item_type = self.chk.iterable_item_type(proper_right_type, e)
-                        mapped = self.chk.named_generic_type("builtins.tuple", [item_type])
-                        return proper_left_type.copy_modified(
-                            items=proper_left_type.items + [UnpackType(mapped)]
-                        )
 
         use_reverse: UseReverse = USE_REVERSE_DEFAULT
         if e.op == "|":
@@ -3467,23 +3447,6 @@ class ExpressionChecker(ExpressionVisitor[Type]):
                 proper_right_type = get_proper_type(self.accept(e.right))
                 if is_named_instance(proper_right_type, "builtins.dict"):
                     use_reverse = USE_REVERSE_NEVER
-
-        if PRECISE_TUPLE_TYPES in self.chk.options.enable_incomplete_feature:
-            # Handle tuple[X, ...] + tuple[Y, Z] = tuple[*tuple[X, ...], Y, Z].
-            if (
-                e.op == "+"
-                and isinstance(proper_left_type, Instance)
-                and proper_left_type.type.fullname == "builtins.tuple"
-            ):
-                proper_right_type = get_proper_type(self.accept(e.right))
-                if (
-                    isinstance(proper_right_type, TupleType)
-                    and proper_right_type.partial_fallback.type.fullname == "builtins.tuple"
-                    and find_unpack_in_list(proper_right_type.items) is None
-                ):
-                    return proper_right_type.copy_modified(
-                        items=[UnpackType(proper_left_type)] + proper_right_type.items
-                    )
 
         if e.op in operators.op_methods:
             method = operators.op_methods[e.op]
@@ -5106,9 +5069,7 @@ class ExpressionChecker(ExpressionVisitor[Type]):
         if type_context_items is not None:
             unpack_in_context = find_unpack_in_list(type_context_items) is not None
         seen_unpack_in_items = False
-        allow_precise_tuples = (
-            unpack_in_context or PRECISE_TUPLE_TYPES in self.chk.options.enable_incomplete_feature
-        )
+        allow_precise_tuples = unpack_in_context
 
         # Infer item types.  Give up if there's a star expression
         # that's not a Tuple.
@@ -5880,29 +5841,19 @@ class ExpressionChecker(ExpressionVisitor[Type]):
             # This branch is very fast, there is no point timing it.
             return self.type_overrides[node]
         # We don't use context manager here to get most precise data (and avoid overhead).
-        record_time = False
-        if self.collect_line_checking_stats and not self.in_expression:
-            t0 = time.perf_counter_ns()
-            self.in_expression = True
-            record_time = True
         self.type_context.append(type_context)
         old_is_callee = self.is_callee
         self.is_callee = is_callee
-        try:
-            if allow_none_return and isinstance(node, CallExpr):
-                typ = self.visit_call_expr(node, allow_none_return=True)
-            elif allow_none_return and isinstance(node, YieldFromExpr):
-                typ = self.visit_yield_from_expr(node, allow_none_return=True)
-            elif allow_none_return and isinstance(node, ConditionalExpr):
-                typ = self.visit_conditional_expr(node, allow_none_return=True)
-            elif allow_none_return and isinstance(node, AwaitExpr):
-                typ = self.visit_await_expr(node, allow_none_return=True)
-            else:
-                typ = node.accept(self)
-        except Exception as err:
-            report_internal_error(
-                err, self.chk.errors.file, node.line, self.chk.errors, self.chk.options
-            )
+        if allow_none_return and isinstance(node, CallExpr):
+            typ = self.visit_call_expr(node, allow_none_return=True)
+        elif allow_none_return and isinstance(node, YieldFromExpr):
+            typ = self.visit_yield_from_expr(node, allow_none_return=True)
+        elif allow_none_return and isinstance(node, ConditionalExpr):
+            typ = self.visit_conditional_expr(node, allow_none_return=True)
+        elif allow_none_return and isinstance(node, AwaitExpr):
+            typ = self.visit_await_expr(node, allow_none_return=True)
+        else:
+            typ = node.accept(self)
         self.is_callee = old_is_callee
         self.type_context.pop()
         assert typ is not None
@@ -5922,9 +5873,6 @@ class ExpressionChecker(ExpressionVisitor[Type]):
             result: Type = AnyType(TypeOfAny.unannotated)
         else:
             result = typ
-        if record_time:
-            self.per_line_checking_time_ns[node.line] += time.perf_counter_ns() - t0
-            self.in_expression = False
         return result
 
     def named_type(self, name: str) -> Instance:

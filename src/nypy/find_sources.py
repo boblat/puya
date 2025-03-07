@@ -94,7 +94,6 @@ class SourceFinder:
         self.explicit_package_bases = get_explicit_package_bases(options)
         self.namespace_packages = options.namespace_packages
         self.exclude = options.exclude
-        self.verbosity = options.verbosity
 
     def is_explicit_package_base(self, path: str) -> bool:
         assert self.explicit_package_bases
@@ -111,7 +110,7 @@ class SourceFinder:
                 continue
             subpath = os.path.join(path, name)
 
-            if matches_exclude(subpath, self.exclude, self.fscache, self.verbosity >= 2):
+            if matches_exclude(subpath, self.exclude, self.fscache, False):
                 continue
 
             if self.fscache.isdir(subpath):

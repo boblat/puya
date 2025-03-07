@@ -1328,7 +1328,7 @@ class TypeAnalyser(SyntheticTypeVisitor[Type], TypeAnalyzerPluginInterface):
                 analyzed = analyzed.item
             items[item_name] = analyzed
         if t.fallback.type is MISSING_FALLBACK:  # anonymous/inline TypedDict
-            if INLINE_TYPEDDICT not in self.options.enable_incomplete_feature:
+            if True:
                 self.fail(
                     "Inline TypedDict is experimental,"
                     " must be enabled with --enable-incomplete-feature=InlineTypedDict",
