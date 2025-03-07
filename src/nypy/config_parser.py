@@ -10,17 +10,12 @@ from io import StringIO
 
 from nypy.errorcodes import error_codes
 
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
-
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, Callable, Final, TextIO, Union
 from typing_extensions import TypeAlias as _TypeAlias
 
 from nypy import defaults
-from nypy.options import PER_MODULE_OPTIONS, Options
+from nypy.options import Options
 
 _CONFIG_VALUE_TYPES: _TypeAlias = Union[
     str, bool, int, float, dict[str, str], list[str], tuple[int, int]
@@ -217,166 +212,6 @@ toml_config_types.update(
 )
 
 
-def _parse_individual_file(
-    config_file: str, stderr: TextIO | None = None
-) -> tuple[MutableMapping[str, Any], dict[str, _INI_PARSER_CALLABLE], str] | None:
-    if not os.path.exists(config_file):
-        return None
-
-    parser: MutableMapping[str, Any]
-    try:
-        if is_toml(config_file):
-            with open(config_file, "rb") as f:
-                toml_data = tomllib.load(f)
-            # Filter down to just mypy relevant toml keys
-            toml_data = toml_data.get("tool", {})
-            if "mypy" not in toml_data:
-                return None
-            toml_data = {"mypy": toml_data["mypy"]}
-            parser = destructure_overrides(toml_data)
-            config_types = toml_config_types
-        else:
-            parser = configparser.RawConfigParser()
-            parser.read(config_file)
-            config_types = ini_config_types
-
-    except (tomllib.TOMLDecodeError, configparser.Error, ConfigTOMLValueError) as err:
-        print(f"{config_file}: {err}", file=stderr)
-        return None
-
-    if os.path.basename(config_file) in defaults.SHARED_CONFIG_NAMES and "mypy" not in parser:
-        return None
-
-    return parser, config_types, config_file
-
-
-def _find_config_file(
-    stderr: TextIO | None = None,
-) -> tuple[MutableMapping[str, Any], dict[str, _INI_PARSER_CALLABLE], str] | None:
-    current_dir = os.path.abspath(os.getcwd())
-
-    while True:
-        for name in defaults.CONFIG_NAMES + defaults.SHARED_CONFIG_NAMES:
-            config_file = os.path.relpath(os.path.join(current_dir, name))
-            ret = _parse_individual_file(config_file, stderr)
-            if ret is None:
-                continue
-            return ret
-
-        if any(
-            os.path.exists(os.path.join(current_dir, cvs_root)) for cvs_root in (".git", ".hg")
-        ):
-            break
-        parent_dir = os.path.dirname(current_dir)
-        if parent_dir == current_dir:
-            break
-        current_dir = parent_dir
-
-    for config_file in defaults.USER_CONFIG_FILES:
-        ret = _parse_individual_file(config_file, stderr)
-        if ret is None:
-            continue
-        return ret
-
-    return None
-
-
-def get_prefix(file_read: str, name: str) -> str:
-    if is_toml(file_read):
-        module_name_str = 'module = "%s"' % "-".join(name.split("-")[1:])
-    else:
-        module_name_str = name
-
-    return f"{file_read}: [{module_name_str}]:"
-
-
-def is_toml(filename: str) -> bool:
-    return filename.lower().endswith(".toml")
-
-
-def destructure_overrides(toml_data: dict[str, Any]) -> dict[str, Any]:
-    """Take the new [[tool.mypy.overrides]] section array in the pyproject.toml file,
-    and convert it back to a flatter structure that the existing config_parser can handle.
-
-    E.g. the following pyproject.toml file:
-
-        [[tool.mypy.overrides]]
-        module = [
-            "a.b",
-            "b.*"
-        ]
-        disallow_untyped_defs = true
-
-        [[tool.mypy.overrides]]
-        module = 'c'
-        disallow_untyped_defs = false
-
-    Would map to the following config dict that it would have gotten from parsing an equivalent
-    ini file:
-
-        {
-            "mypy-a.b": {
-                disallow_untyped_defs = true,
-            },
-            "mypy-b.*": {
-                disallow_untyped_defs = true,
-            },
-            "mypy-c": {
-                disallow_untyped_defs: false,
-            },
-        }
-    """
-    if "overrides" not in toml_data["mypy"]:
-        return toml_data
-
-    if not isinstance(toml_data["mypy"]["overrides"], list):
-        raise ConfigTOMLValueError(
-            "tool.nypy.overrides sections must be an array. Please make "
-            "sure you are using double brackets like so: [[tool.nypy.overrides]]"
-        )
-
-    result = toml_data.copy()
-    for override in result["mypy"]["overrides"]:
-        if "module" not in override:
-            raise ConfigTOMLValueError(
-                "toml config file contains a [[tool.nypy.overrides]] "
-                "section, but no module to override was specified."
-            )
-
-        if isinstance(override["module"], str):
-            modules = [override["module"]]
-        elif isinstance(override["module"], list):
-            modules = override["module"]
-        else:
-            raise ConfigTOMLValueError(
-                "toml config file contains a [[tool.nypy.overrides]] "
-                "section with a module value that is not a string or a list of "
-                "strings"
-            )
-
-        for module in modules:
-            module_overrides = override.copy()
-            del module_overrides["module"]
-            old_config_name = f"mypy-{module}"
-            if old_config_name not in result:
-                result[old_config_name] = module_overrides
-            else:
-                for new_key, new_value in module_overrides.items():
-                    if (
-                        new_key in result[old_config_name]
-                        and result[old_config_name][new_key] != new_value
-                    ):
-                        raise ConfigTOMLValueError(
-                            "toml config file contains "
-                            "[[tool.nypy.overrides]] sections with conflicting "
-                            f"values. Module '{module}' has two different values for '{new_key}'"
-                        )
-                    result[old_config_name][new_key] = new_value
-
-    del result["mypy"]["overrides"]
-    return result
-
-
 def parse_section(
     prefix: str,
     template: Options,
@@ -523,7 +358,7 @@ def split_directive(s: str) -> tuple[list[str], list[str]]:
     return parts, errors
 
 
-def mypy_comments_to_config_map(line: str, template: Options) -> tuple[dict[str, str], list[str]]:
+def mypy_comments_to_config_map(line: str) -> tuple[dict[str, str], list[str]]:
     """Rewrite the mypy comment syntax into ini file syntax."""
     options = {}
     entries, errors = split_directive(line)
@@ -559,7 +394,7 @@ def parse_mypy_comments(
         # Oddly, the only way to get the SectionProxy object with the getboolean
         # method is to create a config parser.
         parser = configparser.RawConfigParser()
-        options, parse_errors = mypy_comments_to_config_map(line, template)
+        options, parse_errors = mypy_comments_to_config_map(line)
         parser["dummy"] = options
         errors.extend((lineno, x) for x in parse_errors)
 
@@ -589,17 +424,3 @@ def parse_mypy_comments(
         sections.update(new_sections)
 
     return sections, errors
-
-
-def get_config_module_names(filename: str | None, modules: list[str]) -> str:
-    if not filename or not modules:
-        return ""
-
-    if not is_toml(filename):
-        return ", ".join(f"[mypy-{module}]" for module in modules)
-
-    return "module = ['%s']" % ("', '".join(sorted(modules)))
-
-
-class ConfigTOMLValueError(ValueError):
-    pass
