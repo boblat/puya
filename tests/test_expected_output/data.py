@@ -17,7 +17,7 @@ from puya.log import Log, LogLevel, logging_context
 from puya.utils import coalesce
 from puyapy.awst_build.main import transform_ast
 from puyapy.options import PuyaPyOptions
-from puyapy.parse import parse_with_mypy
+from puyapy.parse import parse_and_typecheck
 from puyapy.template import parse_template_key_value
 from tests.utils import narrowed_parse_result
 
@@ -293,7 +293,7 @@ def compile_and_update_cases(cases: list[TestCase]) -> None:
             paths=srcs,
             output_bytecode=True,
         )
-        parse_result = parse_with_mypy(puyapy_options.paths)
+        parse_result = parse_and_typecheck(puyapy_options.paths)
         # lower each case further if possible and process
         for case in cases:
             # lower awst for each case individually to order to get any output

@@ -16,7 +16,7 @@ from puyapy.awst_build.arc4_client_gen import write_arc4_client
 from puyapy.awst_build.main import transform_ast
 from puyapy.client_gen import parse_arc56
 from puyapy.options import PuyaPyOptions
-from puyapy.parse import parse_with_mypy
+from puyapy.parse import parse_and_typecheck
 
 # this should contain the lowest version number that this compiler does NOT support
 # i.e. the next minor version after what is defined in stubs/pyproject.toml:tool.poetry.version
@@ -29,7 +29,7 @@ def compile_to_teal(puyapy_options: PuyaPyOptions) -> None:
     with log.logging_context() as log_ctx, log_exceptions():
         logger.debug(puyapy_options)
         try:
-            parse_result = parse_with_mypy(puyapy_options.paths)
+            parse_result = parse_and_typecheck(puyapy_options.paths)
             log_ctx.sources_by_path = parse_result.sources_by_path
             log_ctx.exit_if_errors()
             awst, compilation_targets = transform_ast(parse_result)

@@ -44,6 +44,9 @@ _MYPY_SEVERITY_TO_LOG_LEVEL = {
     "note": log.LogLevel.info,
 }
 
+_MAX_SUPPORTED_ALGOPY_VERSION_EX = version.parse("2.8.0")
+_MIN_SUPPORTED_ALGOPY_VERSION = version.parse(f"{_MAX_SUPPORTED_ALGOPY_VERSION_EX.major}.0.0")
+
 logger = log.get_logger(__name__)
 
 
@@ -99,10 +102,10 @@ class ParseResult:
         }
 
 
-def parse_and_typecheck(
-    paths: Sequence[Path], mypy_options: nypy.options.Options
-) -> tuple[nypy.build.BuildManager, dict[str, SourceModule]]:
+def parse_and_typecheck(paths: Sequence[Path]) -> ParseResult:
     """Generate the ASTs from the build sources, and all imported modules (recursively)"""
+
+    mypy_options = get_mypy_options()
 
     # ensure we have the absolute, canonical paths to the files
     resolved_input_paths = {p.resolve() for p in paths}
@@ -156,7 +159,10 @@ def parse_and_typecheck(
                     discovery_mechanism=discovery_mechanism,
                 )
 
-    return result.manager, ordered_modules
+    return ParseResult(
+        mypy_options=mypy_options,
+        ordered_modules=ordered_modules,
+    )
 
 
 def _check_encoding(mypy_fscache: nypy.fscache.FileSystemCache, module_path: Path) -> None:
@@ -384,20 +390,6 @@ def source_location_from_mypy(file: Path, node: nypy.nodes.Context) -> SourceLoc
     )
 
 
-MAX_SUPPORTED_ALGOPY_VERSION_EX = version.parse("2.8.0")
-MIN_SUPPORTED_ALGOPY_VERSION = version.parse(f"{MAX_SUPPORTED_ALGOPY_VERSION_EX.major}.0.0")
-
-
-def parse_with_mypy(paths: Sequence[Path]) -> ParseResult:
-    mypy_options = get_mypy_options()
-
-    _, ordered_modules = parse_and_typecheck(paths, mypy_options)
-    return ParseResult(
-        mypy_options=mypy_options,
-        ordered_modules=ordered_modules,
-    )
-
-
 def get_mypy_options() -> nypy.options.Options:
     mypy_opts = nypy.options.Options()
 
@@ -501,10 +493,10 @@ def _check_algopy_version(site_packages: Path) -> None:
     algopy_version = version.parse(algopy.version)
     logger.debug(f"found algopy: {algopy_version}")
 
-    if not (MIN_SUPPORTED_ALGOPY_VERSION <= algopy_version < MAX_SUPPORTED_ALGOPY_VERSION_EX):
+    if not (_MIN_SUPPORTED_ALGOPY_VERSION <= algopy_version < _MAX_SUPPORTED_ALGOPY_VERSION_EX):
         logger.warning(
             f"{_STUBS_PACKAGE_NAME} version {algopy_version} is outside the supported range:"
-            f" >={MIN_SUPPORTED_ALGOPY_VERSION}, <{MAX_SUPPORTED_ALGOPY_VERSION_EX}",
+            f" >={_MIN_SUPPORTED_ALGOPY_VERSION}, <{_MAX_SUPPORTED_ALGOPY_VERSION_EX}",
             important=True,
             related_lines=[
                 "This will cause typing errors if there are incompatibilities in the API used.",
