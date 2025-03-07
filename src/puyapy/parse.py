@@ -83,7 +83,6 @@ class SourceModule:
 
 @attrs.frozen
 class ParseResult:
-    mypy_options: nypy.options.Options
     ordered_modules: Mapping[str, SourceModule]
     """All discovered modules, topologically sorted by dependencies.
     The sort order is from leaves (nodes without dependencies) to
@@ -159,10 +158,7 @@ def parse_and_typecheck(paths: Sequence[Path]) -> ParseResult:
                     discovery_mechanism=discovery_mechanism,
                 )
 
-    return ParseResult(
-        mypy_options=mypy_options,
-        ordered_modules=ordered_modules,
-    )
+    return ParseResult(ordered_modules=ordered_modules)
 
 
 def _check_encoding(mypy_fscache: nypy.fscache.FileSystemCache, module_path: Path) -> None:

@@ -30,10 +30,6 @@ class ASTConversionContext:
     _contract_fragments: dict[ContractReference, ContractFragmentBase] = attrs.field(factory=dict)
 
     @property
-    def mypy_options(self) -> nypy.options.Options:
-        return self._parse_result.mypy_options
-
-    @property
     def contract_fragments(self) -> Mapping[ContractReference, ContractFragmentBase]:
         return self._contract_fragments
 

@@ -526,10 +526,8 @@ class ModuleASTConverter(
             return expr.else_expr.accept(self)
 
     def _evaluate_compile_time_constant_condition(self, expr: nypy.nodes.Expression) -> bool:
-        from nypy import reachability
-
-        kind = reachability.infer_condition_value(expr, self.context.mypy_options)
-        if kind == reachability.TRUTH_VALUE_UNKNOWN:
+        kind = _infer_condition_value(expr)
+        if kind == _TRUTH_VALUE_UNKNOWN:
             try:
                 result = expr.accept(self)
             except UnsupportedASTError as ex:
@@ -538,10 +536,10 @@ class ModuleASTConverter(
                     details="only constant valued conditions supported at module level",
                     ex=ex,
                 )
-            kind = reachability.ALWAYS_TRUE if result else reachability.ALWAYS_FALSE
-        if kind in (reachability.ALWAYS_TRUE, reachability.MYPY_FALSE):
+            kind = _ALWAYS_TRUE if result else _ALWAYS_FALSE
+        if kind in (_ALWAYS_TRUE, _TYPECHECKING_FALSE):
             return True
-        elif kind in (reachability.ALWAYS_FALSE, reachability.MYPY_TRUE):
+        elif kind in (_ALWAYS_FALSE, _TYPECHECKING_TRUE):
             return False
         else:
             raise InternalError(
@@ -812,3 +810,52 @@ def _map_scratch_space_reservation(
                     ),
                 )
             ]
+
+
+def _infer_condition_value(expr: nypy.nodes.Expression) -> int:
+    """Infer whether the given condition is always true/false.
+
+    Return ALWAYS_TRUE if always true, ALWAYS_FALSE if always false,
+    MYPY_TRUE if true under mypy and false at runtime, MYPY_FALSE if
+    false under mypy and true at runtime, else TRUTH_VALUE_UNKNOWN.
+    """
+    negated = False
+    alias = expr
+    if isinstance(alias, nypy.nodes.UnaryExpr) and alias.op == "not":
+        expr = alias.expr
+        negated = True
+    result = _TRUTH_VALUE_UNKNOWN
+    if isinstance(expr, nypy.nodes.NameExpr | nypy.nodes.MemberExpr):
+        if expr.name == "TYPE_CHECKING":
+            result = _TYPECHECKING_TRUE
+    elif isinstance(expr, nypy.nodes.OpExpr) and expr.op in ("and", "or"):
+        left = _infer_condition_value(expr.left)
+        if (left in (_ALWAYS_TRUE, _TYPECHECKING_TRUE) and expr.op == "and") or (
+            left in (_ALWAYS_FALSE, _TYPECHECKING_FALSE) and expr.op == "or"
+        ):
+            # Either `True and <other>` or `False or <other>`: the result will
+            # always be the right-hand-side.
+            return _infer_condition_value(expr.right)
+        else:
+            # The result will always be the left-hand-side (e.g. ALWAYS_* or
+            # TRUTH_VALUE_UNKNOWN).
+            return left
+    if negated:
+        result = inverted_truth_mapping[result]
+    return result
+
+
+# Inferred truth value of an expression.
+_ALWAYS_TRUE: typing.Final = 1
+_TYPECHECKING_TRUE: typing.Final = 2  # True when type-checking, False at runtime
+_ALWAYS_FALSE: typing.Final = 3
+_TYPECHECKING_FALSE: typing.Final = 4  # False when type-checking, True at runtime
+_TRUTH_VALUE_UNKNOWN: typing.Final = 5
+
+inverted_truth_mapping: typing.Final = {
+    _ALWAYS_TRUE: _ALWAYS_FALSE,
+    _ALWAYS_FALSE: _ALWAYS_TRUE,
+    _TRUTH_VALUE_UNKNOWN: _TRUTH_VALUE_UNKNOWN,
+    _TYPECHECKING_TRUE: _TYPECHECKING_FALSE,
+    _TYPECHECKING_FALSE: _TYPECHECKING_TRUE,
+}
