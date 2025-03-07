@@ -476,11 +476,6 @@ class FindModuleCache:
                 third_party_inline_dirs.append(non_stub_match)
                 self._update_ns_ancestors(components, non_stub_match)
 
-        if self.options and self.options.use_builtins_fixtures:
-            # Everything should be in fixtures.
-            third_party_inline_dirs.clear()
-            third_party_stubs_dirs.clear()
-            found_possible_third_party_missing_type_hints = False
         python_mypy_path = self.search_paths.mypy_path + self.search_paths.python_path
         candidate_base_dirs = self.find_lib_path_dirs(id, python_mypy_path)
         if use_typeshed:
@@ -791,7 +786,7 @@ def get_search_dirs(python_executable: str | None) -> tuple[list[str], list[str]
 
 
 def compute_search_paths(
-    sources: list[BuildSource], options: Options, data_dir: str, alt_lib_path: str | None = None
+    sources: list[BuildSource], options: Options, data_dir: str
 ) -> SearchPaths:
     """Compute the search paths as specified in PEP 561.
 
@@ -808,47 +803,31 @@ def compute_search_paths(
         )
     )
 
-    if options.use_builtins_fixtures:
-        # Use stub builtins (to speed up test cases and to make them easier to
-        # debug).  This is a test-only feature, so assume our files are laid out
-        # as in the source tree.
-        # We also need to allow overriding where to look for it. Argh.
-        root_dir = os.getenv("MYPY_TEST_PREFIX", None)
-        if not root_dir:
-            root_dir = os.path.dirname(os.path.dirname(__file__))
-        root_dir = os.path.abspath(root_dir)
-        lib_path.appendleft(os.path.join(root_dir, "test-data", "unit", "lib-stub"))
     # alt_lib_path is used by some tests to bypass the normal lib_path mechanics.
     # If we don't have one, grab directories of source files.
     python_path: list[str] = []
-    if not alt_lib_path:
-        for source in sources:
-            # Include directory of the program file in the module search path.
-            if source.base_dir:
-                dir = source.base_dir
-                if dir not in python_path:
-                    python_path.append(dir)
+    for source in sources:
+        # Include directory of the program file in the module search path.
+        if source.base_dir:
+            dir = source.base_dir
+            if dir not in python_path:
+                python_path.append(dir)
 
-        # Do this even if running as a file, for sanity (mainly because with
-        # multiple builds, there could be a mix of files/modules, so its easier
-        # to just define the semantics that we always add the current director
-        # to the lib_path
-        # TODO: Don't do this in some cases; for motivation see see
-        # https://github.com/python/mypy/issues/4195#issuecomment-341915031
-        dir = os.getcwd()
-        if dir not in lib_path:
-            python_path.insert(0, dir)
+    # Do this even if running as a file, for sanity (mainly because with
+    # multiple builds, there could be a mix of files/modules, so its easier
+    # to just define the semantics that we always add the current director
+    # to the lib_path
+    # TODO: Don't do this in some cases; for motivation see see
+    # https://github.com/python/mypy/issues/4195#issuecomment-341915031
+    dir = os.getcwd()
+    if dir not in lib_path:
+        python_path.insert(0, dir)
 
     # Start with a MYPYPATH environment variable at the front of the mypy_path, if defined.
     mypypath = mypy_path()
 
     # Add a config-defined mypy path.
     mypypath.extend(options.mypy_path)
-
-    # If provided, insert the caller-supplied extra module path to the
-    # beginning (highest priority) of the search path.
-    if alt_lib_path:
-        mypypath.insert(0, alt_lib_path)
 
     sys_path, site_packages = get_search_dirs(options.python_executable)
     # We only use site packages for this check

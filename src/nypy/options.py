@@ -305,9 +305,6 @@ class Options:
         # Stop after the semantic analysis phase
         self.semantic_analysis_only = False
 
-        # Use stub builtins fixtures to speed up tests
-        self.use_builtins_fixtures = False
-
         # This should only be set when running certain mypy tests.
         # Use this sparingly to avoid tests diverging from non-test behavior.
         self.test_env = False

@@ -133,12 +133,8 @@ class BuildResult:
 def build(
     sources: list[BuildSource],
     options: Options,
-    alt_lib_path: str | None = None,
     flush_errors: Callable[[str | None, list[str], bool], None] | None = None,
     fscache: FileSystemCache | None = None,
-    stdout: TextIO | None = None,
-    stderr: TextIO | None = None,
-    extra_plugins: Sequence[Plugin] | None = None,
 ) -> BuildResult:
     """Analyze a program.
 
@@ -172,14 +168,8 @@ def build(
         messages.extend(new_messages)
 
     flush_errors = flush_errors or default_flush_errors
-    stdout = stdout or sys.stdout
-    stderr = stderr or sys.stderr
-    extra_plugins = extra_plugins or []
-
     try:
-        result = _build(
-            sources, options, alt_lib_path, flush_errors, fscache, stdout, stderr, extra_plugins
-        )
+        result = _build(sources, options, flush_errors, fscache)
         result.errors = messages
         return result
     except CompileError as e:
@@ -196,12 +186,8 @@ def build(
 def _build(
     sources: list[BuildSource],
     options: Options,
-    alt_lib_path: str | None,
     flush_errors: Callable[[str | None, list[str], bool], None],
     fscache: FileSystemCache | None,
-    stdout: TextIO,
-    stderr: TextIO,
-    extra_plugins: Sequence[Plugin],
 ) -> BuildResult:
     if platform.python_implementation() == "CPython":
         # Run gc less frequently, as otherwise we can spent a large fraction of
@@ -211,12 +197,12 @@ def _build(
     data_dir = default_data_dir()
     fscache = fscache or FileSystemCache()
 
-    search_paths = compute_search_paths(sources, options, data_dir, alt_lib_path)
+    search_paths = compute_search_paths(sources, options, data_dir)
 
     source_set = BuildSourceSet(sources)
     cached_read = fscache.read
     errors = Errors(options, read_source=lambda path: read_py_file(path, cached_read))
-    plugin, snapshot = load_plugins(options, errors, stdout, extra_plugins)
+    plugin, snapshot = load_plugins(options, errors, sys.stdout, [])
 
     # Construct a build manager object to hold state during the build.
     #
@@ -233,15 +219,15 @@ def _build(
         error_formatter=None if options.output is None else OUTPUT_CHOICES.get(options.output),
         flush_errors=flush_errors,
         fscache=fscache,
-        stdout=stdout,
-        stderr=stderr,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
     )
     if manager.verbosity() >= 2:
         manager.trace(repr(options))
 
     reset_global_state()
     try:
-        graph = dispatch(sources, manager, stdout)
+        graph = dispatch(sources, manager, sys.stdout)
         type_state.reset_all_subtype_caches()
         if options.timing_stats is not None:
             dump_timing_stats(options.timing_stats, graph)
@@ -586,12 +572,6 @@ class BuildManager:
         self.version_id = version_id
         self.modules: dict[str, MypyFile] = {}
         self.missing_modules: set[str] = set()
-        self.fg_deps_meta: dict[str, FgDepMeta] = {}
-        # fg_deps holds the dependencies of every module that has been
-        # processed. We store this in BuildManager so that we can compute
-        # dependencies as we go, which allows us to free ASTs and type information,
-        # saving a ton of memory on net.
-        self.fg_deps: dict[str, set[str]] = {}
         # Always convert the plugin to a ChainedPlugin so that it can be manipulated if needed
         if not isinstance(plugin, ChainedPlugin):
             plugin = ChainedPlugin(options, [plugin])
@@ -608,32 +588,27 @@ class BuildManager:
         )
         self.all_types: dict[Expression, Type] = {}  # Enabled by export_types
         self.indirection_detector = TypeIndirectionVisitor()
-        self.stale_modules: set[str] = set()
-        self.rechecked_modules: set[str] = set()
         self.flush_errors = flush_errors
         self.fscache = fscache
         self.find_module_cache = FindModuleCache(
             self.search_paths, self.fscache, self.options, source_set=self.source_set
         )
         for module in CORE_BUILTIN_MODULES:
-            if options.use_builtins_fixtures:
-                continue
             path = self.find_module_cache.find_module(module, fast_path=True)
             if not isinstance(path, str):
                 raise CompileError(
                     [f"Failed to find builtin module {module}, perhaps typeshed is broken?"]
                 )
-            if is_typeshed_file(options.abs_custom_typeshed_dir, path) or is_stub_package_file(
-                path
+            elif not (
+                is_typeshed_file(options.abs_custom_typeshed_dir, path)
+                or is_stub_package_file(path)
             ):
-                continue
-
-            raise CompileError(
-                [
-                    f'mypy: "{os.path.relpath(path)}" shadows library module "{module}"',
-                    f'note: A user-defined top-level module with name "{module}" is not supported',
-                ]
-            )
+                raise CompileError(
+                    [
+                        f'mypy: "{os.path.relpath(path)}" shadows library module "{module}"',
+                        f'note: A user-defined top-level module with name "{module}" is not supported',
+                    ]
+                )
 
         # a mapping from source files to their corresponding shadow files
         # for efficient lookup
@@ -1191,16 +1166,6 @@ class State:
 
     def is_interface_fresh(self) -> bool:
         return self.externally_same
-
-    def mark_as_rechecked(self) -> None:
-        """Marks this module as having been fully re-analyzed by the type-checker."""
-        self.manager.rechecked_modules.add(self.id)
-
-    def mark_interface_stale(self, *, on_errors: bool = False) -> None:
-        """Marks this module as having a stale public interface, and discards the cache data."""
-        self.externally_same = False
-        if not on_errors:
-            self.manager.stale_modules.add(self.id)
 
     def check_blockers(self) -> None:
         """Raise CompileError if a blocking error is detected."""
@@ -2466,7 +2431,6 @@ def process_stale_scc(graph: Graph, scc: list[str], manager: BuildManager) -> No
                 graph[id].xpath, formatter=manager.error_formatter
             )
             manager.flush_errors(manager.errors.simplify_path(graph[id].xpath), errors, False)
-        graph[id].mark_as_rechecked()
 
 
 def sorted_components(
