@@ -8,14 +8,8 @@ from pathlib import Path
 
 from packaging import version
 
-import nypy.build
 import nypy.errors
-import nypy.find_sources
-import nypy.fscache
-import nypy.modulefinder
-import nypy.nodes
 import nypy.options
-import nypy.util
 from puya import log
 from puya.arc56 import create_arc56_json
 from puya.awst.nodes import AWST
