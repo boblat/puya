@@ -114,9 +114,7 @@ def parse_and_typecheck(paths: Sequence[Path]) -> ParseResult:
         options=mypy_options,
         fscache=_MYPY_FSCACHE,
     )
-    build_source_paths = {
-        Path(m.path).resolve() for m in mypy_build_sources if m.path and not m.followed
-    }
+    build_source_paths = {Path(m.path).resolve() for m in mypy_build_sources if m.path}
     result = _mypy_build(mypy_build_sources, mypy_options, _MYPY_FSCACHE)
     # Sometimes when we call back into mypy, there might be errors.
     # We don't want to crash when that happens.

@@ -228,7 +228,6 @@ def parse(
             options=options,
             is_stub=is_stub_file,
             errors=errors,
-            strip_function_bodies=False,
             path=fnam,
         ).visit(ast)
     except SyntaxError as e:
@@ -352,7 +351,6 @@ class ASTConverter:
         is_stub: bool,
         errors: Errors,
         *,
-        strip_function_bodies: bool,
         path: str,
     ) -> None:
         # 'C' for class, 'D' for function signature, 'F' for function, 'L' for lambda
@@ -362,7 +360,6 @@ class ASTConverter:
         self.options = options
         self.is_stub = is_stub
         self.errors = errors
-        self.strip_function_bodies = strip_function_bodies
         self.path = path
 
         self.type_ignores: dict[int, list[str]] = {}
@@ -431,8 +428,6 @@ class ASTConverter:
         stmts: Sequence[ast3.stmt],
         *,
         ismodule: bool = False,
-        can_strip: bool = False,
-        is_coroutine: bool = False,
     ) -> list[Statement]:
         # A "# type: ignore" comment before the first statement of a module
         # ignores the whole module:
@@ -459,49 +454,11 @@ class ASTConverter:
             mark_block_unreachable(block)
             return [block]
 
-        stack = self.class_and_function_stack
-        # Fast case for stripping function bodies
-        if (
-            can_strip
-            and self.strip_function_bodies
-            and len(stack) == 1
-            and stack[0] == "F"
-            and not is_coroutine
-        ):
-            return []
-
-        res: list[Statement] = []
+        res = list[Statement]()
         for stmt in stmts:
             node = self.visit(stmt)
             res.append(node)
 
-        # Slow case for stripping function bodies
-        if can_strip and self.strip_function_bodies:
-            if stack[-2:] == ["C", "F"]:
-                if is_possible_trivial_body(res):
-                    can_strip = False
-                else:
-                    # We only strip method bodies if they don't assign to an attribute, as
-                    # this may define an attribute which has an externally visible effect.
-                    visitor = FindAttributeAssign()
-                    for s in res:
-                        s.accept(visitor)
-                        if visitor.found:
-                            can_strip = False
-                            break
-
-            if can_strip and stack[-1] == "F" and is_coroutine:
-                # Yields inside an async function affect the return type and should not
-                # be stripped.
-                yield_visitor = FindYield()
-                for s in res:
-                    s.accept(yield_visitor)
-                    if yield_visitor.found:
-                        can_strip = False
-                        break
-
-            if can_strip:
-                return []
         return res
 
     def translate_type_comment(
@@ -585,11 +542,7 @@ class ASTConverter:
         self, stmts: list[ast3.stmt], *, can_strip: bool = False, is_coroutine: bool = False
     ) -> Block:
         assert stmts  # must be non-empty
-        b = Block(
-            self.fix_function_overloads(
-                self.translate_stmt_list(stmts, can_strip=can_strip, is_coroutine=is_coroutine)
-            )
-        )
+        b = Block(self.fix_function_overloads(self.translate_stmt_list(stmts)))
         self.set_block_lines(b, stmts)
         return b
 

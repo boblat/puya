@@ -1019,19 +1019,18 @@ class State:
             self.dep_line_map = {id: line for id, line in zip(all_deps, self.meta.dep_lines)}
             if temporary:
                 self.load_tree(temporary=True)
-            if not False:
-                # Special case: if there were a previously missing package imported here
-                # and it is not present, then we need to re-calculate dependencies.
-                # This is to support patterns like this:
-                #     from missing_package import missing_module  # type: ignore
-                # At first mypy doesn't know that `missing_module` is a module
-                # (it may be a variable, a class, or a function), so it is not added to
-                # suppressed dependencies. Therefore, when the package with module is added,
-                # we need to re-calculate dependencies.
-                # NOTE: see comment below for why we skip this in fine grained mode.
-                if exist_added_packages(self.suppressed, manager, self.options):
-                    self.parse_file()  # This is safe because the cache is anyway stale.
-                    self.compute_dependencies()
+            # Special case: if there were a previously missing package imported here
+            # and it is not present, then we need to re-calculate dependencies.
+            # This is to support patterns like this:
+            #     from missing_package import missing_module  # type: ignore
+            # At first mypy doesn't know that `missing_module` is a module
+            # (it may be a variable, a class, or a function), so it is not added to
+            # suppressed dependencies. Therefore, when the package with module is added,
+            # we need to re-calculate dependencies.
+            # NOTE: see comment below for why we skip this in fine grained mode.
+            if exist_added_packages(self.suppressed, manager, self.options):
+                self.parse_file()  # This is safe because the cache is anyway stale.
+                self.compute_dependencies()
         else:
             # When doing a fine-grained cache load, pretend we only
             # know about modules that have cache information and defer
@@ -1809,12 +1808,7 @@ def dump_graph(graph: Graph, stdout: TextIO | None = None) -> None:
     print("[" + ",\n ".join(node.dumps() for node in nodes) + "\n]", file=stdout)
 
 
-def load_graph(
-    sources: list[BuildSource],
-    manager: BuildManager,
-    old_graph: Graph | None = None,
-    new_modules: list[State] | None = None,
-) -> Graph:
+def load_graph(sources: list[BuildSource], manager: BuildManager) -> Graph:
     """Given some source files, load the full dependency graph.
 
     If an old_graph is passed in, it is used as the starting point and
@@ -1828,13 +1822,13 @@ def load_graph(
     there are syntax errors.
     """
 
-    graph: Graph = old_graph if old_graph is not None else {}
+    graph: Graph = {}
 
     # The deque is used to implement breadth-first traversal.
     # TODO: Consider whether to go depth-first instead.  This may
     # affect the order in which we process files within import cycles.
-    new = new_modules if new_modules is not None else []
-    entry_points: set[str] = set()
+    new = list[State]()
+    entry_points = set[str]()
     # Seed the graph with the initial root sources.
     for bs in sources:
         try:
@@ -1843,7 +1837,7 @@ def load_graph(
                 path=bs.path,
                 source=bs.text,
                 manager=manager,
-                root_source=not bs.followed,
+                root_source=True,
             )
         except ModuleNotFound:
             continue
