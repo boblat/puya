@@ -6117,14 +6117,14 @@
     "1171": {
       "op": "txn Sender",
       "defined_out": [
-        "tmp%0#0",
+        "box_map_key%0#0",
         "val_as_bytes%0#0",
         "val_as_bytes%1#0"
       ],
       "stack_out": [
         "val_as_bytes%0#0",
         "val_as_bytes%1#0",
-        "tmp%0#0"
+        "box_map_key%0#0"
       ]
     },
     "1173": {
@@ -6341,10 +6341,10 @@
     "1211": {
       "op": "txn Sender",
       "defined_out": [
-        "tmp%0#3"
+        "box_map_key%0#0"
       ],
       "stack_out": [
-        "tmp%0#3"
+        "box_map_key%0#0"
       ]
     },
     "1213": {
@@ -7365,44 +7365,44 @@
     "1322": {
       "op": "txn Sender",
       "defined_out": [
+        "box_map_key%0#0",
         "cumulative_offset#0",
         "question_index#0",
-        "questions_count#0",
-        "tmp%20#0"
+        "questions_count#0"
       ],
       "stack_out": [
         "questions_count#0",
         "cumulative_offset#0",
         "question_index#0",
         "question_index#0",
-        "tmp%20#0"
+        "box_map_key%0#0"
       ]
     },
     "1324": {
       "op": "dup",
       "defined_out": [
+        "box_map_key%0#0",
+        "box_map_key%0#0 (copy)",
         "cumulative_offset#0",
         "question_index#0",
-        "questions_count#0",
-        "tmp%20#0",
-        "tmp%20#0 (copy)"
+        "questions_count#0"
       ],
       "stack_out": [
         "questions_count#0",
         "cumulative_offset#0",
         "question_index#0",
         "question_index#0",
-        "tmp%20#0",
-        "tmp%20#0 (copy)"
+        "box_map_key%0#0",
+        "box_map_key%0#0 (copy)"
       ]
     },
     "1325": {
       "op": "box_del",
       "defined_out": [
+        "box_map_key%0#0",
         "cumulative_offset#0",
         "question_index#0",
         "questions_count#0",
-        "tmp%20#0",
         "{box_del}"
       ],
       "stack_out": [
@@ -7410,7 +7410,7 @@
         "cumulative_offset#0",
         "question_index#0",
         "question_index#0",
-        "tmp%20#0",
+        "box_map_key%0#0",
         "{box_del}"
       ]
     },
@@ -7421,7 +7421,7 @@
         "cumulative_offset#0",
         "question_index#0",
         "question_index#0",
-        "tmp%20#0"
+        "box_map_key%0#0"
       ]
     },
     "1327": {
@@ -7431,7 +7431,7 @@
         "cumulative_offset#0",
         "question_index#0",
         "question_index#0",
-        "tmp%20#0",
+        "box_map_key%0#0",
         "answer_ids#0 (copy)"
       ]
     },

@@ -6209,34 +6209,34 @@
     "1100": {
       "op": "txn Sender",
       "defined_out": [
+        "box_map_key%0#0",
         "copy%0#0",
         "cumulative_offset#0",
-        "question_index#0",
-        "tmp%20#0"
+        "question_index#0"
       ],
       "stack_out": [
         "questions_count#0",
         "cumulative_offset#0",
         "question_index#0",
         "copy%0#0",
-        "tmp%20#0"
+        "box_map_key%0#0"
       ]
     },
     "1102": {
       "op": "bytec_0 // \"\"",
       "defined_out": [
         "\"\"",
+        "box_map_key%0#0",
         "copy%0#0",
         "cumulative_offset#0",
-        "question_index#0",
-        "tmp%20#0"
+        "question_index#0"
       ],
       "stack_out": [
         "questions_count#0",
         "cumulative_offset#0",
         "question_index#0",
         "copy%0#0",
-        "tmp%20#0",
+        "box_map_key%0#0",
         "\"\""
       ]
     },
@@ -6248,50 +6248,50 @@
         "question_index#0",
         "copy%0#0",
         "\"\"",
-        "tmp%20#0"
+        "box_map_key%0#0"
       ]
     },
     "1104": {
       "op": "concat",
       "defined_out": [
+        "box_key%0#0",
         "copy%0#0",
         "cumulative_offset#0",
-        "question_index#0",
-        "tmp%21#0"
+        "question_index#0"
       ],
       "stack_out": [
         "questions_count#0",
         "cumulative_offset#0",
         "question_index#0",
         "copy%0#0",
-        "tmp%21#0"
+        "box_key%0#0"
       ]
     },
     "1105": {
       "op": "dup",
       "defined_out": [
+        "box_key%0#0",
+        "box_key%0#0 (copy)",
         "copy%0#0",
         "cumulative_offset#0",
-        "question_index#0",
-        "tmp%21#0",
-        "tmp%21#0 (copy)"
+        "question_index#0"
       ],
       "stack_out": [
         "questions_count#0",
         "cumulative_offset#0",
         "question_index#0",
         "copy%0#0",
-        "tmp%21#0",
-        "tmp%21#0 (copy)"
+        "box_key%0#0",
+        "box_key%0#0 (copy)"
       ]
     },
     "1106": {
       "op": "box_del",
       "defined_out": [
+        "box_key%0#0",
         "copy%0#0",
         "cumulative_offset#0",
         "question_index#0",
-        "tmp%21#0",
         "{box_del}"
       ],
       "stack_out": [
@@ -6299,7 +6299,7 @@
         "cumulative_offset#0",
         "question_index#0",
         "copy%0#0",
-        "tmp%21#0",
+        "box_key%0#0",
         "{box_del}"
       ]
     },
@@ -6310,7 +6310,7 @@
         "cumulative_offset#0",
         "question_index#0",
         "copy%0#0",
-        "tmp%21#0"
+        "box_key%0#0"
       ]
     },
     "1108": {
@@ -6319,7 +6319,7 @@
         "questions_count#0",
         "cumulative_offset#0",
         "question_index#0",
-        "tmp%21#0",
+        "box_key%0#0",
         "copy%0#0"
       ]
     },
@@ -6839,20 +6839,20 @@
       "stack_in": [],
       "op": "txn Sender",
       "defined_out": [
-        "tmp%0#0"
+        "box_map_key%0#0"
       ],
       "stack_out": [
-        "tmp%0#0"
+        "box_map_key%0#0"
       ]
     },
     "1183": {
       "op": "bytec_0 // \"\"",
       "defined_out": [
         "\"\"",
-        "tmp%0#0"
+        "box_map_key%0#0"
       ],
       "stack_out": [
-        "tmp%0#0",
+        "box_map_key%0#0",
         "\"\""
       ]
     },
@@ -6860,16 +6860,16 @@
       "op": "swap",
       "stack_out": [
         "\"\"",
-        "tmp%0#0"
+        "box_map_key%0#0"
       ]
     },
     "1185": {
       "op": "concat",
       "defined_out": [
-        "tmp%1#0"
+        "box_key%0#0"
       ],
       "stack_out": [
-        "tmp%1#0"
+        "box_key%0#0"
       ]
     },
     "1186": {

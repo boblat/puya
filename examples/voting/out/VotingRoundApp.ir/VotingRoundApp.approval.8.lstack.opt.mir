@@ -1009,7 +1009,7 @@ subroutine get_preconditions:
         itob                                                                                      (𝕡) signature#0 | val_as_bytes%0#0,val_as_bytes%1#0
         // voting/voting.py:215
         // return Txn.sender in self.votes_by_account
-        txn Sender                                                                                (𝕡) signature#0 | val_as_bytes%0#0,val_as_bytes%1#0,tmp%0#0
+        txn Sender                                                                                (𝕡) signature#0 | val_as_bytes%0#0,val_as_bytes%1#0,box_map_key%0#0
         box_len                                                                                   (𝕡) signature#0 | val_as_bytes%0#0,val_as_bytes%1#0,maybe_value%0#0,maybe_exists%0#0
         l-store maybe_exists%0#0 1                                                                (𝕡) signature#0 | val_as_bytes%0#0,val_as_bytes%1#0,maybe_exists%0#0,maybe_value%0#0
         pop 1                                                                                     (𝕡) signature#0 | val_as_bytes%0#0,val_as_bytes%1#0,maybe_exists%0#0
@@ -1057,7 +1057,7 @@ subroutine vote:
         assert // Voting not open                                                                 (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 |
         // voting/voting.py:215
         // return Txn.sender in self.votes_by_account
-        txn Sender                                                                                (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | tmp%0#3
+        txn Sender                                                                                (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | box_map_key%0#0
         box_len                                                                                   (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | maybe_value%0#1,maybe_exists%0#0
         l-store maybe_exists%0#0 1                                                                (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | maybe_exists%0#0,maybe_value%0#1
         pop 1                                                                                     (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | maybe_exists%0#0
@@ -1199,12 +1199,12 @@ subroutine vote:
         v-store cumulative_offset#0                                                               (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0
         // voting/voting.py:202
         // self.votes_by_account[Txn.sender] = answer_ids.copy()
-        txn Sender                                                                                (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0,tmp%20#0
-        l-load-copy tmp%20#0 0                                                                    (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0,tmp%20#0,tmp%20#0 (copy)
-        box_del                                                                                   (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0,tmp%20#0,{box_del}
-        pop 1                                                                                     (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0,tmp%20#0
-        l-load tmp%20#0 0                                                                         (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0,tmp%20#0
-        p-load answer_ids#0                                                                       (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0,tmp%20#0,answer_ids#0 (copy)
+        txn Sender                                                                                (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0,box_map_key%0#0
+        l-load-copy box_map_key%0#0 0                                                             (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0,box_map_key%0#0,box_map_key%0#0 (copy)
+        box_del                                                                                   (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0,box_map_key%0#0,{box_del}
+        pop 1                                                                                     (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0,box_map_key%0#0
+        l-load box_map_key%0#0 0                                                                  (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0,box_map_key%0#0
+        p-load answer_ids#0                                                                       (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0,box_map_key%0#0,answer_ids#0 (copy)
         box_put                                                                                   (𝕡) fund_min_bal_req#0,signature#0,answer_ids#0 | question_index#0
         // voting/voting.py:203
         // self.voter_count += 1

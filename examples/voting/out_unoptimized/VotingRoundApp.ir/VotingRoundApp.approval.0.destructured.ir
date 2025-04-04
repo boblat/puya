@@ -298,10 +298,10 @@ subroutine examples.voting.voting.VotingRoundApp.vote(fund_min_bal_req: uint64, 
         examples.voting.voting.VotingRoundApp.increment_vote_in_box(tmp%19#0)
         let cumulative_offset#0: uint64 = (+ cumulative_offset#0 options_count#0)
         let copy%0#0: bytes = answer_ids#0
-        let tmp%20#0: bytes[32] = (txn Sender)
-        let tmp%21#0: bytes = (concat "" tmp%20#0)
-        (box_del tmp%21#0)
-        (box_put tmp%21#0 copy%0#0)
+        let box_map_key%0#0: bytes[32] = (txn Sender)
+        let box_key%0#0: bytes = (concat "" box_map_key%0#0)
+        (box_del box_key%0#0)
+        (box_put box_key%0#0 copy%0#0)
         let (maybe_value%2#0: uint64, maybe_exists%2#0: bool) = (app_global_get_ex 0u "voter_count")
         (assert maybe_exists%2#0) // check self.voter_count exists
         let new_state_value%0#0: uint64 = (+ maybe_value%2#0 1u)
@@ -343,9 +343,9 @@ subroutine examples.voting.voting.VotingRoundApp.voting_open() -> bool:
 
 subroutine examples.voting.voting.VotingRoundApp.already_voted() -> bool:
     block@0: // L213
-        let tmp%0#0: bytes[32] = (txn Sender)
-        let tmp%1#0: bytes = (concat "" tmp%0#0)
-        let (maybe_value%0#0: uint64, maybe_exists%0#0: bool) = (box_len tmp%1#0)
+        let box_map_key%0#0: bytes[32] = (txn Sender)
+        let box_key%0#0: bytes = (concat "" box_map_key%0#0)
+        let (maybe_value%0#0: uint64, maybe_exists%0#0: bool) = (box_len box_key%0#0)
         return maybe_exists%0#0
 
 subroutine examples.voting.voting.VotingRoundApp.store_option_counts(option_counts: bytes) -> bytes:

@@ -952,7 +952,7 @@ debug: Simplified (* question_index#1 1u) to question_index#1
 debug: Simplified (btoi tmp%16#0) to (getbyte array_head_and_tail%0#0 question_index#1)
 debug: Simplified (* question_index#1 1u) to question_index#1
 debug: Simplified (btoi tmp%17#0) to (getbyte array_head_and_tail%1#0 question_index#1)
-debug: Simplified (concat "" tmp%20#0) to tmp%20#0
+debug: Simplified (concat "" box_map_key%0#0) to box_map_key%0#0
 debug: Optimizer: Inner Txn Field Replacer
 debug: Optimizer: Replace Compiled References
 debug: Optimizer: Simplify Control Ops
@@ -971,8 +971,8 @@ debug: Found equivalence set: tmp%4#0, tmp%6#0, tmp%7#0
 debug: selected tmp%4#0 from equivalence set
 debug: Found equivalence set: question_index#1, item_offset%0#0, item_offset%1#0
 debug: selected question_index#1 from equivalence set
-debug: Found equivalence set: tmp%20#0, tmp%21#0
-debug: selected tmp%20#0 from equivalence set
+debug: Found equivalence set: box_map_key%0#0, box_key%0#0
+debug: selected box_map_key%0#0 from equivalence set
 debug: Copy propagation made 1 modifications
 debug: Optimizer: Redundant Slot Op Elimination
 debug: Optimizing subroutine examples.voting.voting.VotingRoundApp.voting_open
@@ -999,7 +999,7 @@ debug: Optimizer: Copy Propagation
 debug: Optimizer: Elide Itxn Field Calls
 debug: Optimizer: Remove Unused Variables
 debug: Optimizer: Intrinsic Simplifier
-debug: Simplified (concat "" tmp%0#0) to tmp%0#0
+debug: Simplified (concat "" box_map_key%0#0) to box_map_key%0#0
 debug: Optimizer: Inner Txn Field Replacer
 debug: Optimizer: Replace Compiled References
 debug: Optimizer: Simplify Control Ops
@@ -1311,8 +1311,8 @@ debug: Optimizer: Perform Subroutine Inlining
 debug: Optimizer: Split Parallel Copies
 debug: Optimizer: Constant Replacer
 debug: Optimizer: Copy Propagation
-debug: Found equivalence set: tmp%0#0, tmp%1#0
-debug: selected tmp%0#0 from equivalence set
+debug: Found equivalence set: box_map_key%0#0, box_key%0#0
+debug: selected box_map_key%0#0 from equivalence set
 debug: Optimizer: Elide Itxn Field Calls
 debug: Optimizer: Remove Unused Variables
 debug: Optimizer: Intrinsic Simplifier
@@ -2133,10 +2133,11 @@ debug: Performing SSA IR destructuring for examples.voting.voting.VotingRoundApp
 debug: Converting to CSSA
 debug: Removing Phi nodes
 debug: Coalescing local variables in examples.voting.voting.VotingRoundApp.vote using strategy RootOperandGrouping
+debug: Coalescing box_map_key%0#0 with [box_map_key%0#1]
 debug: Coalescing maybe_exists%0#0 with [maybe_exists%0#1]
 debug: Coalescing cumulative_offset#0 with [cumulative_offset#5, cumulative_offset#1, cumulative_offset#2]
 debug: Coalescing question_index#0 with [question_index#5, question_index#1, question_index#2]
-debug: Coalescing resulted in 20 replacement/s
+debug: Coalescing resulted in 22 replacement/s
 debug: Sequentializing parallel copies in examples.voting.voting.VotingRoundApp.vote
 debug: loc: {question_index#0=question_index#0, cumulative_offset#0=cumulative_offset#0}
 debug: pred: {question_index#0=question_index#0, cumulative_offset#0=cumulative_offset#0}
@@ -2477,8 +2478,8 @@ debug: Inserted get_preconditions_block@0.ops[1]: 'l-store-copy to_encode%0#0 0'
 debug: Replaced get_preconditions_block@0.ops[3]: 'v-load to_encode%0#0' with 'l-load to_encode%0#0'
 debug: Inserted get_preconditions_block@0.ops[8]: 'l-store-copy to_encode%1#0 0'
 debug: Replaced get_preconditions_block@0.ops[10]: 'v-load to_encode%1#0' with 'l-load to_encode%1#0'
-debug: Inserted get_preconditions_block@0.ops[14]: 'l-store-copy tmp%0#0 0'
-debug: Replaced get_preconditions_block@0.ops[16]: 'v-load tmp%0#0' with 'l-load tmp%0#0'
+debug: Inserted get_preconditions_block@0.ops[14]: 'l-store-copy box_map_key%0#0 0'
+debug: Replaced get_preconditions_block@0.ops[16]: 'v-load box_map_key%0#0' with 'l-load box_map_key%0#0'
 debug: Inserted get_preconditions_block@0.ops[24]: 'l-store-copy to_encode%3#0 0'
 debug: Replaced get_preconditions_block@0.ops[26]: 'v-load to_encode%3#0' with 'l-load to_encode%3#0'
 debug: Inserted get_preconditions_block@0.ops[32]: 'l-store-copy encoded_tuple_buffer%2#0 0'
@@ -2501,8 +2502,8 @@ debug: Inserted vote_block@0.ops[5]: 'l-store-copy tmp%0#0 0'
 debug: Replaced vote_block@0.ops[7]: 'v-load tmp%0#0' with 'l-load tmp%0#0'
 debug: Inserted vote_block@0.ops[10]: 'l-store-copy tmp%1#0 0'
 debug: Replaced vote_block@0.ops[12]: 'v-load tmp%1#0' with 'l-load tmp%1#0'
-debug: Inserted vote_block@0.ops[15]: 'l-store-copy tmp%0#3 0'
-debug: Replaced vote_block@0.ops[17]: 'v-load tmp%0#3' with 'l-load tmp%0#3'
+debug: Inserted vote_block@0.ops[15]: 'l-store-copy box_map_key%0#0 0'
+debug: Replaced vote_block@0.ops[17]: 'v-load box_map_key%0#0' with 'l-load box_map_key%0#0'
 debug: Inserted vote_block@0.ops[23]: 'l-store-copy tmp%3#0 0'
 debug: Replaced vote_block@0.ops[25]: 'v-load tmp%3#0' with 'l-load tmp%3#0'
 debug: Inserted vote_block@0.ops[41]: 'l-store-copy tmp%4#0 0'
@@ -2553,8 +2554,8 @@ debug: Inserted vote_for_body@2.ops[42]: 'l-store-copy current_vote#0 0'
 debug: Replaced vote_for_body@2.ops[44]: 'v-load current_vote#0' with 'l-load current_vote#0'
 debug: Inserted vote_for_body@2.ops[47]: 'l-store-copy tmp%0#1 0'
 debug: Replaced vote_for_body@2.ops[49]: 'v-load tmp%0#1' with 'l-load tmp%0#1'
-debug: Inserted vote_for_body@2.ops[61]: 'l-store-copy tmp%20#0 0'
-debug: Replaced vote_for_body@2.ops[63]: 'v-load tmp%20#0' with 'l-load tmp%20#0'
+debug: Inserted vote_for_body@2.ops[61]: 'l-store-copy box_map_key%0#0 0'
+debug: Replaced vote_for_body@2.ops[63]: 'v-load box_map_key%0#0' with 'l-load box_map_key%0#0'
 debug: Inserted vote_for_body@2.ops[11]: 'l-store-copy maybe_exists%1#0 1'
 debug: Replaced vote_for_body@2.ops[14]: 'v-load maybe_exists%1#0' with 'l-load maybe_exists%1#0'
 debug: Inserted vote_for_body@2.ops[23]: 'l-store-copy options_count#0 0'
@@ -2569,8 +2570,8 @@ debug: Inserted vote_for_body@2.ops[13]: 'l-store-copy maybe_value%1#0 1'
 debug: Replaced vote_for_body@2.ops[17]: 'v-load maybe_value%1#0' with 'l-load maybe_value%1#0'
 debug: Inserted vote_for_body@2.ops[55]: 'l-store-copy tmp%1#1 0'
 debug: Replaced vote_for_body@2.ops[59]: 'v-load tmp%1#1' with 'l-load tmp%1#1'
-debug: Inserted vote_for_body@2.ops[69]: 'l-store-copy tmp%20#0 0'
-debug: Replaced vote_for_body@2.ops[72]: 'v-load tmp%20#0' with 'l-load tmp%20#0'
+debug: Inserted vote_for_body@2.ops[69]: 'l-store-copy box_map_key%0#0 0'
+debug: Replaced vote_for_body@2.ops[72]: 'v-load box_map_key%0#0' with 'l-load box_map_key%0#0'
 debug: Inserted vote_for_body@2.ops[80]: 'l-store-copy maybe_value%2#0 1'
 debug: Replaced vote_for_body@2.ops[84]: 'v-load maybe_value%2#0' with 'l-load maybe_value%2#0'
 debug: Inserted vote_for_body@2.ops[27]: 'l-store-copy answer_option_index#0 1'

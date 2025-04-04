@@ -1271,8 +1271,8 @@
       "op": "txn Sender",
       "defined_out": [
         "answer_ids#0",
-        "fund_min_bal_req#0",
-        "tmp%0#10"
+        "box_map_key%0#0",
+        "fund_min_bal_req#0"
       ],
       "stack_out": [
         "answer_ids#0",
@@ -1295,7 +1295,7 @@
         "total_options#0",
         "fund_min_bal_req#0",
         "answer_ids#0",
-        "tmp%0#10"
+        "box_map_key%0#0"
       ]
     },
     "295": {
@@ -3842,11 +3842,11 @@
       "defined_out": [
         "answer_ids#0",
         "array_head_and_tail%0#0",
+        "box_map_key%0#0",
         "cumulative_offset#0",
         "question_index#0",
         "questions_count#0",
-        "tmp%0#2",
-        "tmp%20#1"
+        "tmp%0#2"
       ],
       "stack_out": [
         "answer_ids#0",
@@ -3869,7 +3869,7 @@
         "total_options#0",
         "answer_ids#0",
         "question_index#0",
-        "tmp%20#1"
+        "box_map_key%0#0"
       ]
     },
     "409": {
@@ -3877,12 +3877,12 @@
       "defined_out": [
         "answer_ids#0",
         "array_head_and_tail%0#0",
+        "box_map_key%0#0",
+        "box_map_key%0#0 (copy)",
         "cumulative_offset#0",
         "question_index#0",
         "questions_count#0",
-        "tmp%0#2",
-        "tmp%20#1",
-        "tmp%20#1 (copy)"
+        "tmp%0#2"
       ],
       "stack_out": [
         "answer_ids#0",
@@ -3905,8 +3905,8 @@
         "total_options#0",
         "answer_ids#0",
         "question_index#0",
-        "tmp%20#1",
-        "tmp%20#1 (copy)"
+        "box_map_key%0#0",
+        "box_map_key%0#0 (copy)"
       ]
     },
     "410": {
@@ -3914,11 +3914,11 @@
       "defined_out": [
         "answer_ids#0",
         "array_head_and_tail%0#0",
+        "box_map_key%0#0",
         "cumulative_offset#0",
         "question_index#0",
         "questions_count#0",
         "tmp%0#2",
-        "tmp%20#1",
         "{box_del}"
       ],
       "stack_out": [
@@ -3942,7 +3942,7 @@
         "total_options#0",
         "answer_ids#0",
         "question_index#0",
-        "tmp%20#1",
+        "box_map_key%0#0",
         "{box_del}"
       ]
     },
@@ -3969,7 +3969,7 @@
         "total_options#0",
         "answer_ids#0",
         "question_index#0",
-        "tmp%20#1"
+        "box_map_key%0#0"
       ]
     },
     "412": {
@@ -3994,7 +3994,7 @@
         "tmp%14#1",
         "total_options#0",
         "question_index#0",
-        "tmp%20#1",
+        "box_map_key%0#0",
         "answer_ids#0"
       ]
     },
@@ -4785,7 +4785,7 @@
     "455": {
       "op": "txn Sender",
       "defined_out": [
-        "tmp%0#10",
+        "box_map_key%0#0",
         "val_as_bytes%0#0",
         "val_as_bytes%1#0"
       ],
@@ -4810,7 +4810,7 @@
         "total_options#0",
         "val_as_bytes%0#0",
         "val_as_bytes%1#0",
-        "tmp%0#10"
+        "box_map_key%0#0"
       ]
     },
     "457": {
