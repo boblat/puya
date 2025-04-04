@@ -15,7 +15,7 @@ from puya.awst.to_code_visitor import ToCodeVisitor
 from puya.awst.txn_fields import TxnField
 from puya.awst.wtypes import WInnerTransaction, WInnerTransactionFields
 from puya.errors import CodeError, InternalError
-from puya.ir.arc4_types import effective_array_encoding
+from puya.ir.arc4_types import effective_array_encoding, wtype_to_arc4_wtype
 from puya.ir.avm_ops import AVMOp
 from puya.ir.builder import arc4, arrays, flow_control, mem, storage
 from puya.ir.builder._tuple_util import get_tuple_item_values
@@ -869,6 +869,25 @@ class FunctionIRBuilder(
         self, expr: awst_nodes.AppAccountStateExpression
     ) -> TExpression:
         return storage.visit_app_account_state_expression(self.context, expr)
+
+    def visit_box_map_key_expression(self, expr: awst_nodes.BoxMapKeyExpression) -> TExpression:
+        factory = OpFactory(self.context, expr.source_location)
+        prefix = self.context.visitor.visit_and_materialise_single(expr.prefix)
+        key_vp = self.context.visitor.visit_expr(expr.key)
+        key_wtype = expr.key.wtype
+        if isinstance(key_wtype, wtypes.WTuple):
+            arc4_wtype = wtype_to_arc4_wtype(key_wtype, expr.source_location)
+            key_vp = arc4.encode_value_provider(
+                context=self.context,
+                value_provider=key_vp,
+                arc4_wtype=arc4_wtype,
+                value_wtype=expr.key.wtype,
+                loc=expr.source_location,
+            )
+        (key,) = self.context.visitor.materialise_value_provider(key_vp, "box_map_key")
+        if key.ir_type.maybe_avm_type == AVMType.uint64:
+            key = factory.itob(key, "box_map_key")
+        return factory.concat(prefix, key, "box_key")
 
     def visit_box_value_expression(self, expr: awst_nodes.BoxValueExpression) -> TExpression:
         return storage.visit_box_value(self.context, expr)

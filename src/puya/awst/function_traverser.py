@@ -372,6 +372,11 @@ class FunctionTraverser(
         expr.field.accept(self)
 
     @typing.override
+    def visit_box_map_key_expression(self, expr: awst_nodes.BoxMapKeyExpression) -> None:
+        expr.prefix.accept(self)
+        expr.key.accept(self)
+
+    @typing.override
     def visit_box_value_expression(self, expr: awst_nodes.BoxValueExpression) -> None:
         expr.key.accept(self)
 
