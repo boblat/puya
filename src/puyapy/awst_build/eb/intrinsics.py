@@ -48,7 +48,7 @@ class Arc4SignatureBuilder(FunctionBuilder):
             ]:
                 if not isinstance(fmethod.metadata, ARC4ABIMethodData):
                     logger.error("method is not an ARC-4 ABI method", location=location)
-                    return dummy_value(pytypes.BytesType, location)
+                    return dummy_value(pytypes.VarBytesType, location)
 
                 abi_method_data = fmethod.metadata
                 signature = ARC4Signature(
@@ -61,7 +61,7 @@ class Arc4SignatureBuilder(FunctionBuilder):
             case _:
                 arg = expect.exactly_one_arg(args, location, default=expect.default_none)
                 if arg is None:
-                    return dummy_value(pytypes.BytesType, location)
+                    return dummy_value(pytypes.VarBytesType, location)
                 str_value = expect.simple_string_literal(
                     arg, default=expect.default_fixed_value("")
                 )

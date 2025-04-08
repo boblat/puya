@@ -65,8 +65,8 @@ class ApplicationExpressionBuilder(UInt64BackedReferenceValueExpressionBuilder):
     def __init__(self, expr: Expression):
         native_access_member = "id"
         field_mapping = {
-            "approval_program": ("AppApprovalProgram", pytypes.BytesType),
-            "clear_state_program": ("AppClearStateProgram", pytypes.BytesType),
+            "approval_program": ("AppApprovalProgram", pytypes.VarBytesType),
+            "clear_state_program": ("AppClearStateProgram", pytypes.VarBytesType),
             "global_num_uint": ("AppGlobalNumUint", pytypes.UInt64Type),
             "global_num_bytes": ("AppGlobalNumByteSlice", pytypes.UInt64Type),
             "local_num_uint": ("AppLocalNumUint", pytypes.UInt64Type),

@@ -109,7 +109,7 @@ class BoxValueExpressionBuilder(ValueProxyExpressionBuilder[pytypes.PyType, BoxV
 class _ValueBytes(ValueProxyExpressionBuilder):
     def __init__(self, expr: BoxValueExpression, location: SourceLocation) -> None:
         self._typed = expr
-        super().__init__(pytypes.BytesType, cast_to_bytes(expr, location))
+        super().__init__(pytypes.VarBytesType, cast_to_bytes(expr, location))
 
     @typing.override
     def member_access(self, name: str, location: SourceLocation) -> NodeBuilder:

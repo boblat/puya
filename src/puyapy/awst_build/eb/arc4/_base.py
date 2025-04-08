@@ -89,7 +89,7 @@ class ARC4FromLogBuilder(FunctionBuilder):
         arg_names: list[str | None],
         location: SourceLocation,
     ) -> InstanceBuilder:
-        arg = expect.exactly_one_arg_of_type_else_dummy(args, pytypes.BytesType, location)
+        arg = expect.exactly_one_arg_of_type_else_dummy(args, pytypes.VarBytesType, location)
         result_expr = self.abi_expr_from_log(self.typ, arg, location)
         return builder_for_instance(self.typ, result_expr)
 

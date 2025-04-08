@@ -584,7 +584,7 @@ def _create_abi_call_expr(
         return itxn_builder
     itxn_builder = itxn_builder.single_eval()
     assert isinstance(itxn_builder, InnerTransactionExpressionBuilder)
-    last_log = itxn_builder.get_field_value(TxnField.LastLog, pytypes.BytesType, location)
+    last_log = itxn_builder.get_field_value(TxnField.LastLog, pytypes.VarBytesType, location)
     abi_result = ARC4FromLogBuilder.abi_expr_from_log(arc4_return_type, last_log, location)
     # the declared result type may be different to the arc4 signature return type
     # due to automatic conversion of ARC-4 -> native types

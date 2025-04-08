@@ -49,6 +49,18 @@ def pytype_to_arc4_pytype(
     match pytype:
         case pytypes.BoolType:
             return pytypes.ARC4BoolType
+        case pytypes.BytesType(length=length):
+            if length is None:
+                return pytypes.ARC4DynamicBytesType
+            else:
+                # TODO: Use arc4 static bytes when/if it exists?
+                return pytypes.GenericARC4StaticArrayType.parameterise(
+                    (
+                        pytypes.ARC4ByteType,
+                        pytypes.TypingLiteralType(value=length, source_location=None),
+                    ),
+                    source_location=None,
+                )
         case pytypes.NamedTupleType():
             return pytypes.StructType(
                 base=pytypes.ARC4StructBaseType,
@@ -83,8 +95,6 @@ def pytype_to_arc4_pytype(
         return pytypes.ARC4UIntN_Aliases[64]
     elif pytypes.BigUIntType <= pytype:
         return pytypes.ARC4UIntN_Aliases[512]
-    elif pytypes.BytesType <= pytype:
-        return pytypes.ARC4DynamicBytesType
     elif pytypes.StringType <= pytype:
         return pytypes.ARC4StringType
     elif pytype.is_type_or_subtype(pytypes.ApplicationType, pytypes.AssetType):

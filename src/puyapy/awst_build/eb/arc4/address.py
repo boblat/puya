@@ -71,7 +71,7 @@ class AddressTypeBuilder(BytesBackedTypeBuilder[pytypes.ArrayType]):
         elif arg.pytype == pytypes.AccountType:  # Account is a final type
             result = _address_from_native(arg)
         else:
-            arg = expect.argument_of_type_else_dummy(arg, pytypes.BytesType)
+            arg = expect.argument_of_type_else_dummy(arg, pytypes.VarBytesType)
             arg = arg.single_eval()
             is_correct_length = NumericComparisonExpression(
                 operator=NumericComparison.eq,
@@ -138,7 +138,7 @@ def _address_to_native(builder: InstanceBuilder) -> Expression:
 
 
 def _address_from_native(builder: InstanceBuilder) -> Expression:
-    assert builder.pytype.is_type_or_subtype(pytypes.AccountType, pytypes.BytesType)
+    assert builder.pytype.is_type_or_subtype(pytypes.AccountType, pytypes.VarBytesType)
     return ReinterpretCast(
         expr=builder.resolve(),
         wtype=wtypes.arc4_address_alias,

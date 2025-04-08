@@ -45,7 +45,7 @@ class _FromBytes(FunctionBuilder):
         location: SourceLocation,
     ) -> InstanceBuilder:
         arg = expect.exactly_one_arg_of_type_else_dummy(
-            args, pytypes.BytesType, location, resolve_literal=True
+            args, pytypes.VarBytesType, location, resolve_literal=True
         )
         result_expr = ReinterpretCast(
             expr=arg.resolve(),

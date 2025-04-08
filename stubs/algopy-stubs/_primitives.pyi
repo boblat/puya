@@ -2,15 +2,20 @@
 import typing
 from collections.abc import Container, Iterator, Reversible
 
+import typing_extensions
+
+
 class UInt64:
     """A 64-bit unsigned integer, one of the primary data types on the AVM"""
 
     __match_value__: int
     __match_args__ = ("__match_value__",)
+
     # ~~~ https://docs.python.org/3/reference/datamodel.html#basic-customization ~~~
     def __init__(self, value: int = 0, /) -> None:
         """A UInt64 can be initialized with a Python int literal, or an int variable
         declared at the module level"""
+
     # TODO: mypy suggests due to Liskov below should be other: object
     #       need to consider ramifications here, ignoring it for now
     def __eq__(self, other: UInt64 | int) -> bool:  # type: ignore[override]
@@ -30,9 +35,11 @@ class UInt64:
 
     def __gt__(self, other: UInt64 | int) -> bool:
         """A UInt64 can use the `>` operator with another UInt64 or int"""
+
     # truthiness
     def __bool__(self) -> bool:
         """A UInt64 will evaluate to `False` if zero, and `True` otherwise"""
+
     # ~~~ https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types ~~~
     # +
     def __add__(self, other: UInt64 | int) -> UInt64:
@@ -49,6 +56,7 @@ class UInt64:
         """A UInt64 can be incremented with another UInt64 or int e.g. `a += UInt(2)`.
 
         This will error on overflow"""
+
     # -
     def __sub__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can be subtracted with another UInt64 or int e.g. `UInt(4) - 2`.
@@ -64,6 +72,7 @@ class UInt64:
         """A UInt64 can be subtracted with another UInt64 or int e.g. `a -= UInt64(2)`.
 
         This will error on underflow"""
+
     # *
     def __mul__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can be multiplied with another UInt64 or int e.g. `4 + UInt64(2)`.
@@ -79,6 +88,7 @@ class UInt64:
         """A UInt64 can be multiplied with another UInt64 or int e.g. `a*= UInt64(2)`.
 
         This will error on overflow"""
+
     # //
     def __floordiv__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can be floor divided with another UInt64 or int e.g. `UInt64(4) // 2`.
@@ -94,6 +104,7 @@ class UInt64:
         """A UInt64 can be floor divided with another UInt64 or int e.g. `a //= UInt64(2)`.
 
         This will error on divide by zero"""
+
     # %
     def __mod__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can be modded with another UInt64 or int e.g. `UInt64(4) % 2`.
@@ -109,6 +120,7 @@ class UInt64:
         """A UInt64 can be modded with another UInt64 or int e.g. `a %= UInt64(2)`.
 
         This will error on mod by zero"""
+
     # TODO: __divmod__? only supported as single op via divmodw though 🤔
     # **, pow
     def __pow__(self, power: UInt64 | int) -> UInt64:
@@ -125,6 +137,7 @@ class UInt64:
         """A UInt64 can be raised to the power of another UInt64 or int e.g. `a **= UInt64(2)`.
 
         This will error on overflow"""
+
     # <<
     def __lshift__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can be left shifted by another UInt64 or int e.g. `UInt64(4) << 2`"""
@@ -134,6 +147,7 @@ class UInt64:
 
     def __ilshift__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can be left shifted by another UInt64 or int e.g. `a <<= UInt64(2)`"""
+
     # >>
     def __rshift__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can be right shifted by another UInt64 or int e.g. `UInt64(4) >> 2`"""
@@ -143,6 +157,7 @@ class UInt64:
 
     def __irshift__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can be right shifted by another UInt64 or int e.g. `a >>= UInt64(2)`"""
+
     # &
     def __and__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can bitwise and with another UInt64 or int e.g. `UInt64(4) & 2`"""
@@ -152,6 +167,7 @@ class UInt64:
 
     def __iand__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can bitwise and with another UInt64 or int e.g. `a &= UInt64(2)`"""
+
     # ^
     def __xor__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can bitwise xor with another UInt64 or int e.g. `UInt64(4) ^ 2`"""
@@ -161,6 +177,7 @@ class UInt64:
 
     def __ixor__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can bitwise xor with another UInt64 or int e.g. `a ^= UInt64(2)`"""
+
     # |
     def __or__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can bitwise or with another UInt64 or int e.g. `UInt64(4) | 2`"""
@@ -170,6 +187,7 @@ class UInt64:
 
     def __ior__(self, other: UInt64 | int) -> UInt64:
         """A UInt64 can bitwise or with another UInt64 or int e.g. `a |= UInt64(2)`"""
+
     # ~
     def __invert__(self) -> UInt64:
         """A UInt64 can be bitwise inverted e.g. `~UInt64(4)`"""
@@ -180,11 +198,21 @@ class UInt64:
     def __pos__(self) -> UInt64:
         """Supports unary + operator. Redundant given the type is unsigned"""
 
-class Bytes(Reversible[Bytes]):
-    """A byte sequence, with a maximum length of 4096 bytes, one of the primary data types on the AVM"""
+
+_TByteLength = typing_extensions.TypeVar("_TByteLength", bound=int, default=int, covariant=True)
+
+
+class Bytes(Reversible[Bytes], typing.Generic[_TByteLength]):
+    """
+    A byte sequence, one of the primary data types on the AVM.
+
+    If _TByteLength is specified, the sequence must be of length _TByteLength
+    else, a variable length sequence with a maximum length of 4096 bytes
+    """
 
     __match_value__: bytes
     __match_args__ = ("__match_value__",)
+
     def __init__(self, value: bytes = b"", /):
         """Bytes can be initialized with a Python bytes literal, or bytes variable
         declared at the module level"""
@@ -201,7 +229,7 @@ class Bytes(Reversible[Bytes]):
     def from_hex(value: str, /) -> Bytes:
         """Creates Bytes from a hex/octal encoded string e.g. `Bytes.from_hex("FF")`"""
 
-    def __add__(self, other: Bytes | bytes) -> Bytes:
+    def __add__(self, other: Bytes[typing.Any] | bytes) -> Bytes:
         """Concatenate Bytes with another Bytes or bytes literal
         e.g. `Bytes(b"Hello ") + b"World"`."""
 
@@ -212,10 +240,12 @@ class Bytes(Reversible[Bytes]):
     def __iadd__(self, other: Bytes | bytes) -> Bytes:
         """Concatenate Bytes with another Bytes or bytes literal
         e.g. `a += Bytes(b"World")`."""
+
     # NOTE: __len__ is enforced to return int at runtime (not even a subtype is allowed)
     @property
     def length(self) -> UInt64:
         """Returns the length of the Bytes"""
+
     # truthiness
     def __bool__(self) -> bool:
         """Returns `True` if length of bytes is >0"""
@@ -231,6 +261,7 @@ class Bytes(Reversible[Bytes]):
 
     def __reversed__(self) -> Iterator[Bytes]:
         """Bytes can be iterated in reverse, yield each preceding byte starting at the end"""
+
     # mypy suggests due to Liskov below should be other: object
     # need to consider ramifications here, ignoring it for now
     def __eq__(self, other: Bytes | bytes) -> bool:  # type: ignore[override]
@@ -238,6 +269,7 @@ class Bytes(Reversible[Bytes]):
 
     def __ne__(self, other: Bytes | bytes) -> bool:  # type: ignore[override]
         """Bytes can be compared using the `!=` operator with another Bytes or bytes"""
+
     # bitwise operators
     # &
     def __and__(self, other: Bytes | bytes) -> Bytes:
@@ -245,18 +277,21 @@ class Bytes(Reversible[Bytes]):
 
     def __iand__(self, other: Bytes | bytes) -> Bytes:
         """Bytes can bitwise and with another Bytes or bytes e.g. `a &= Bytes(b"0F")`"""
+
     # ^
     def __xor__(self, other: Bytes | bytes) -> Bytes:
         """Bytes can bitwise xor with another Bytes or bytes e.g. `Bytes(b"FF") ^ b"0F")`"""
 
     def __ixor__(self, other: Bytes | bytes) -> Bytes:
         """Bytes can bitwise xor with another Bytes or bytes e.g. `a ^= Bytes(b"0F")`"""
+
     # |
     def __or__(self, other: Bytes | bytes) -> Bytes:
         """Bytes can bitwise or with another Bytes or bytes e.g. `Bytes(b"FF") | b"0F")`"""
 
     def __ior__(self, other: Bytes | bytes) -> Bytes:
         """Bytes can bitwise or with another Bytes or bytes e.g. `a |= Bytes(b"0F")`"""
+
     # ~
     def __invert__(self) -> Bytes:
         """Bytes can be bitwise inverted e.g. `~Bytes(b"FF)`"""
@@ -264,6 +299,7 @@ class Bytes(Reversible[Bytes]):
     def __contains__(self, other: Bytes | bytes) -> bool:
         """Test whether another Bytes is a substring of this one.
         Note this is expensive due to a lack of AVM support."""
+
 
 class BytesBacked(typing.Protocol):
     """Represents a type that is a single bytes value"""
@@ -275,6 +311,7 @@ class BytesBacked(typing.Protocol):
     @property
     def bytes(self) -> Bytes:
         """Get the underlying Bytes"""
+
 
 class String(BytesBacked, Container[String]):
     """A UTF-8 encoded string.
@@ -289,6 +326,7 @@ class String(BytesBacked, Container[String]):
 
     __match_value__: str
     __match_args__ = ("__match_value__",)
+
     def __init__(self, value: str = "", /):
         """A String can be initialized with a Python `str` literal, or a `str` variable
         declared at the module level"""
@@ -307,6 +345,7 @@ class String(BytesBacked, Container[String]):
 
     def __bool__(self) -> bool:
         """Returns `True` if the string is not empty"""
+
     # mypy suggests due to Liskov below should be other: object
     # need to consider ramifications here, ignoring it for now
     def __eq__(self, other: String | str) -> bool:  # type: ignore[override]
@@ -343,17 +382,20 @@ class String(BytesBacked, Container[String]):
         The behaviour should mirror `str.join`.
         """
 
+
 class BigUInt(BytesBacked):
     """A variable length (max 512-bit) unsigned integer"""
 
     __match_value__: int
     __match_args__ = ("__match_value__",)
+
     # TODO: consider how to handle cases where sizes exceeds 512, which can happen on + or *,
     #       but the result is no longer usable with any further ops.
     # ~~~ https://docs.python.org/3/reference/datamodel.html#basic-customization ~~~
     def __init__(self, value: UInt64 | int = 0, /) -> None:
         """A BigUInt can be initialized with a UInt64, a Python int literal, or an int variable
         declared at the module level"""
+
     # TODO: mypy suggests due to Liskov below should be other: object
     #       need to consider ramifications here, ignoring it for now
     def __eq__(self, other: BigUInt | UInt64 | int) -> bool:  # type: ignore[override]
@@ -373,9 +415,11 @@ class BigUInt(BytesBacked):
 
     def __gt__(self, other: BigUInt | UInt64 | int) -> bool:
         """A BigUInt can use the `>` operator with another BigUInt, UInt64 or int"""
+
     # truthiness
     def __bool__(self) -> bool:
         """A BigUInt will evaluate to `False` if zero, and `True` otherwise"""
+
     # ~~~ https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types ~~~
     # +
     def __add__(self, other: BigUInt | UInt64 | int) -> BigUInt:
@@ -386,6 +430,7 @@ class BigUInt(BytesBacked):
 
     def __iadd__(self, other: BigUInt | UInt64 | int) -> BigUInt:
         """A BigUInt can be incremented with another BigUInt, UInt64 or int e.g. `a += BigUInt(2)`."""
+
     # -
     def __sub__(self, other: BigUInt | UInt64 | int) -> BigUInt:
         """A BigUInt can be subtracted with another BigUInt, UInt64 or int e.g. `BigUInt(4) - 2`.
@@ -401,6 +446,7 @@ class BigUInt(BytesBacked):
         """A BigUInt can be subtracted with another BigUInt, UInt64 or int e.g. `a -= BigUInt(2)`.
 
         This will error on underflow"""
+
     # *
     def __mul__(self, other: BigUInt | UInt64 | int) -> BigUInt:
         """A BigUInt can be multiplied with another BigUInt, UInt64 or int e.g. `4 + BigUInt(2)`."""
@@ -410,6 +456,7 @@ class BigUInt(BytesBacked):
 
     def __imul__(self, other: BigUInt | UInt64 | int) -> BigUInt:
         """A BigUInt can be multiplied with another BigUInt, UInt64 or int e.g. `a*= BigUInt(2)`."""
+
     # //
     def __floordiv__(self, other: BigUInt | UInt64 | int) -> BigUInt:
         """A BigUInt can be floor divided with another BigUInt, UInt64 or int e.g. `BigUInt(4) // 2`.
@@ -425,6 +472,7 @@ class BigUInt(BytesBacked):
         """A BigUInt can be floor divided with another BigUInt, UInt64 or int e.g. `a //= BigUInt(2)`.
 
         This will error on divide by zero"""
+
     # %
     def __mod__(self, other: BigUInt | UInt64 | int) -> BigUInt:
         """A BigUInt can be modded with another BigUInt, UInt64 or int e.g. `BigUInt(4) % 2`.
@@ -440,6 +488,7 @@ class BigUInt(BytesBacked):
         """A BigUInt can be modded with another BigUInt, UInt64 or int e.g. `a %= BigUInt(2)`.
 
         This will error on mod by zero"""
+
     # &
     def __and__(self, other: BigUInt | UInt64 | int) -> BigUInt:
         """A BigUInt can bitwise and with another BigUInt, UInt64 or int e.g. `BigUInt(4) & 2`"""
@@ -449,6 +498,7 @@ class BigUInt(BytesBacked):
 
     def __iand__(self, other: BigUInt | UInt64 | int) -> BigUInt:
         """A BigUInt can bitwise and with another BigUInt, UInt64 or int e.g. `a &= BigUInt(2)`"""
+
     # ^
     def __xor__(self, other: BigUInt | UInt64 | int) -> BigUInt:
         """A BigUInt can bitwise xor with another BigUInt, UInt64 or int e.g. `BigUInt(4) ^ 2`"""
@@ -458,6 +508,7 @@ class BigUInt(BytesBacked):
 
     def __ixor__(self, other: BigUInt | UInt64 | int) -> BigUInt:
         """A BigUInt can bitwise xor with another BigUInt, UInt64 or int e.g. `a ^= BigUInt(2)`"""
+
     # |
     def __or__(self, other: BigUInt | UInt64 | int) -> BigUInt:
         """A BigUInt can bitwise or with another BigUInt, UInt64 or int e.g. `BigUInt(4) | 2`"""

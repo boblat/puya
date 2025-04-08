@@ -43,7 +43,7 @@ class PythonITxnArgument:
         if self.array_promote:
             assert self.field.is_array
         if self.auto_serialize_bytes:
-            assert self.type is pytypes.BytesType
+            assert self.type is pytypes.VarBytesType
             assert not self.additional_types
             assert not self.literal_overrides
 
@@ -125,12 +125,12 @@ PYTHON_ITXN_ARGUMENTS = {
     # vote_key: Bytes | bytes = ...,
     "vote_key": PythonITxnArgument(
         field=TxnField.VotePK,
-        type=pytypes.BytesType,
+        type=pytypes.VarBytesType,
     ),
     # selection_key: Bytes | bytes = ...,
     "selection_key": PythonITxnArgument(
         field=TxnField.SelectionPK,
-        type=pytypes.BytesType,
+        type=pytypes.VarBytesType,
     ),
     # vote_first: UInt64 | int = ...,
     "vote_first": PythonITxnArgument(
@@ -156,7 +156,7 @@ PYTHON_ITXN_ARGUMENTS = {
     # state_proof_key: Bytes | bytes = ...,
     "state_proof_key": PythonITxnArgument(
         field=TxnField.StateProofPK,
-        type=pytypes.BytesType,
+        type=pytypes.VarBytesType,
     ),
     # ## asset config
     # config_asset: Asset | UInt64 | int = ...,
@@ -173,14 +173,14 @@ PYTHON_ITXN_ARGUMENTS = {
     # unit_name: String | Bytes | str | bytes = ...,
     "unit_name": PythonITxnArgument(
         field=TxnField.ConfigAssetUnitName,
-        type=pytypes.BytesType,
+        type=pytypes.VarBytesType,
         additional_types=(pytypes.StringType,),
         literal_overrides={pytypes.StrLiteralType: pytypes.StringType},
     ),
     # asset_name: String | Bytes | str | bytes = ...,
     "asset_name": PythonITxnArgument(
         field=TxnField.ConfigAssetName,
-        type=pytypes.BytesType,
+        type=pytypes.VarBytesType,
         additional_types=(pytypes.StringType,),
         literal_overrides={pytypes.StrLiteralType: pytypes.StringType},
     ),
@@ -197,14 +197,14 @@ PYTHON_ITXN_ARGUMENTS = {
     # url: String | Bytes | bytes | str = ...,
     "url": PythonITxnArgument(
         field=TxnField.ConfigAssetURL,
-        type=pytypes.BytesType,
+        type=pytypes.VarBytesType,
         additional_types=(pytypes.StringType,),
         literal_overrides={pytypes.StrLiteralType: pytypes.StringType},
     ),
     # metadata_hash: Bytes | bytes = ...,
     "metadata_hash": PythonITxnArgument(
         field=TxnField.ConfigAssetMetadataHash,
-        type=pytypes.BytesType,
+        type=pytypes.VarBytesType,
     ),
     # manager: Account | str = ...,
     "manager": PythonITxnArgument(
@@ -280,13 +280,13 @@ PYTHON_ITXN_ARGUMENTS = {
     # approval_program: Bytes | bytes | tuple[Bytes, ...] = ...,
     "approval_program": PythonITxnArgument(
         field=TxnField.ApprovalProgramPages,
-        type=pytypes.BytesType,
+        type=pytypes.VarBytesType,
         array_promote=True,
     ),
     # clear_state_program: Bytes | bytes | tuple[Bytes, ...] = ...,
     "clear_state_program": PythonITxnArgument(
         field=TxnField.ClearStateProgramPages,
-        type=pytypes.BytesType,
+        type=pytypes.VarBytesType,
         array_promote=True,
     ),
     # on_completion: OnCompleteAction | UInt64 | int = ...,
@@ -323,7 +323,7 @@ PYTHON_ITXN_ARGUMENTS = {
     # app_args: tuple[object, ...] = ...,
     "app_args": PythonITxnArgument(
         field=TxnField.ApplicationArgs,
-        type=pytypes.BytesType,
+        type=pytypes.VarBytesType,
         auto_serialize_bytes=True,
     ),
     # accounts: tuple[Account, ...] = ...,
@@ -355,7 +355,7 @@ PYTHON_ITXN_ARGUMENTS = {
     # note: String | Bytes | str | bytes = ...,
     "note": PythonITxnArgument(
         field=TxnField.Note,
-        type=pytypes.BytesType,
+        type=pytypes.VarBytesType,
         additional_types=(pytypes.StringType,),
         literal_overrides={pytypes.StrLiteralType: pytypes.StringType},
     ),

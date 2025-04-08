@@ -29,6 +29,19 @@ class WType:
         return self.name
 
 
+@attrs.frozen(kw_only=True, eq=False)
+class BytesWType(WType):
+    length: int | None = attrs.field()
+    name: str = attrs.field(init=False)
+    immutable: bool = attrs.field(default=True, init=False)
+    scalar_type: typing.Literal[AVMType.bytes] = attrs.field(default=AVMType.uint64, init=False)
+    ephemeral: bool = attrs.field(default=False, init=False)
+
+    @name.default
+    def _name_factory(self) -> str:
+        return "bytes" if self.length is None else f"bytes[{self.length}]"
+
+
 void_wtype: typing.Final = WType(
     name="void",
     scalar_type=None,
@@ -53,11 +66,8 @@ biguint_wtype: typing.Final = WType(
     immutable=True,
 )
 
-bytes_wtype: typing.Final = WType(
-    name="bytes",
-    scalar_type=AVMType.bytes,
-    immutable=True,
-)
+bytes_wtype: typing.Final = BytesWType(length=None)
+
 string_wtype: typing.Final = WType(
     name="string",
     scalar_type=AVMType.bytes,

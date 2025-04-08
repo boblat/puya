@@ -572,10 +572,60 @@ BigUIntType: typing.Final[RuntimeType] = _SimpleType(
     name="algopy._primitives.BigUInt",
     wtype=wtypes.biguint_wtype,
 )
-BytesType: typing.Final[RuntimeType] = _SimpleType(
+
+
+@typing.final
+@attrs.frozen(order=False)
+class BytesType(RuntimeType):
+    length: int | None = attrs.field(default=None)
+    source_location: SourceLocation | None = attrs.field(eq=False, default=None)
+    wtype: wtypes.WType = attrs.field(init=False)
+    name: str = attrs.field(init=False)
+
+    @wtype.default
+    def _wtype(self) -> wtypes.WType:
+        return wtypes.BytesWType(length=self.length)
+
+    @name.default
+    def _name(self) -> str:
+        return (
+            "algopy._primitives.Bytes"
+            if self.length is None
+            else f"algopy._primitives.Bytes[{self.length}]"
+        )
+
+
+VarBytesType: typing.Final[BytesType] = BytesType()
+
+
+def _make_bytes_parameterise() -> _Parameterise[BytesType]:
+    def parameterise(
+        self: _GenericType[BytesType],
+        args: _TypeArgs,
+        source_location: SourceLocation | None,
+    ) -> BytesType:
+        try:
+            (length_t,) = args
+        except ValueError:
+            raise CodeError(
+                f"expected a single type parameter, got {len(args)} parameters", source_location
+            ) from None
+        length = _require_int_literal(self, length_t, source_location, position_qualifier="first")
+
+        return BytesType(
+            generic=self,
+            length=length,
+            source_location=source_location,
+        )
+
+    return parameterise
+
+
+GenericBytesType: typing.Final = _GenericType(
     name="algopy._primitives.Bytes",
-    wtype=wtypes.bytes_wtype,
+    parameterise=_make_bytes_parameterise(),
 )
+
 StringType: typing.Final[RuntimeType] = _SimpleType(
     name="algopy._primitives.String",
     wtype=wtypes.string_wtype,
@@ -797,8 +847,8 @@ CompiledContractType: typing.Final = _register_builtin(
     NamedTupleType(
         name="algopy._compiled.CompiledContract",
         fields={
-            "approval_program": GenericTupleType.parameterise([BytesType, BytesType], None),
-            "clear_state_program": GenericTupleType.parameterise([BytesType, BytesType], None),
+            "approval_program": GenericTupleType.parameterise([BytesType(), BytesType()], None),
+            "clear_state_program": GenericTupleType.parameterise([BytesType(), BytesType()], None),
             "extra_program_pages": UInt64Type,
             "global_uints": UInt64Type,
             "global_bytes": UInt64Type,
@@ -1017,7 +1067,7 @@ GenericBoxType: typing.Final = _GenericType(
 BoxRefType: typing.Final = _register_builtin(
     StorageProxyType(
         name="algopy._box.BoxRef",
-        content=BytesType,
+        content=VarBytesType,
         content_wtype=BytesType.wtype,
         wtype=wtypes.box_key,
         generic=None,

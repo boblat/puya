@@ -113,7 +113,7 @@ class BoxRefProxyExpressionBuilder(
                     box_proxy=self.resolve(),
                     op_code="box_extract",
                     args={"start_index": pytypes.UInt64Type, "length": pytypes.UInt64Type},
-                    return_type=pytypes.BytesType,
+                    return_type=pytypes.VarBytesType,
                 )
             case "resize":
                 return _IntrinsicMethod(
@@ -128,7 +128,7 @@ class BoxRefProxyExpressionBuilder(
                     location,
                     box_proxy=self.resolve(),
                     op_code="box_replace",
-                    args={"start_index": pytypes.UInt64Type, "value": pytypes.BytesType},
+                    args={"start_index": pytypes.UInt64Type, "value": pytypes.VarBytesType},
                     return_type=pytypes.NoneType,
                 )
             case "splice":
@@ -139,20 +139,20 @@ class BoxRefProxyExpressionBuilder(
                     args={
                         "start_index": pytypes.UInt64Type,
                         "length": pytypes.UInt64Type,
-                        "value": pytypes.BytesType,
+                        "value": pytypes.VarBytesType,
                     },
                     return_type=pytypes.NoneType,
                 )
 
             case "get":
                 return BoxGetExpressionBuilder(
-                    self._box_key_expr(location), content_type=pytypes.BytesType
+                    self._box_key_expr(location), content_type=pytypes.VarBytesType
                 )
             case "put":
                 return _Put(location, box_proxy=self.resolve())
             case "maybe":
                 return BoxMaybeExpressionBuilder(
-                    self._box_key_expr(location), content_type=pytypes.BytesType
+                    self._box_key_expr(location), content_type=pytypes.VarBytesType
                 )
             case "length":
                 return UInt64ExpressionBuilder(
@@ -265,7 +265,7 @@ class _Put(FunctionBuilder):
         location: SourceLocation,
     ) -> InstanceBuilder:
         arg = expect.exactly_one_arg_of_type_else_dummy(
-            args, pytypes.BytesType, location, resolve_literal=True
+            args, pytypes.VarBytesType, location, resolve_literal=True
         )
         data = arg.resolve()
         return NoneExpressionBuilder(

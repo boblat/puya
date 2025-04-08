@@ -47,8 +47,10 @@ logger = log.get_logger(__name__)
 
 
 class BytesTypeBuilder(TypeBuilder):
-    def __init__(self, location: SourceLocation):
-        super().__init__(pytypes.BytesType, location)
+    def __init__(self, typ: pytypes.PyType, location: SourceLocation):
+        assert isinstance(typ, pytypes.BytesType)
+        self._length = typ.length
+        super().__init__(typ, location)
 
     @typing.override
     def try_convert_literal(
@@ -78,7 +80,9 @@ class BytesTypeBuilder(TypeBuilder):
         arg = expect.at_most_one_arg(args, location)
         match arg:
             case InstanceBuilder(pytype=pytypes.BytesLiteralType):
-                return arg.resolve_literal(BytesTypeBuilder(location))
+                return arg.resolve_literal(
+                    BytesTypeBuilder(pytypes.BytesType(length=self._length), location)
+                )
             case None:
                 value = BytesConstant(
                     value=b"", encoding=BytesEncoding.unknown, source_location=location
@@ -101,6 +105,11 @@ class BytesTypeBuilder(TypeBuilder):
                 return _FromEncodedStr(location, BytesEncoding.base16)
             case _:
                 return super().member_access(name, location)
+
+
+class VarBytesTypeBuilder(BytesTypeBuilder):
+    def __init__(self, source_location: SourceLocation) -> None:
+        super().__init__(pytypes.VarBytesType, source_location)
 
 
 class _FromEncodedStr(FunctionBuilder):
@@ -151,13 +160,14 @@ class _FromEncodedStr(FunctionBuilder):
                     value=bytes_value,
                     encoding=self.encoding,
                 )
-                return BytesExpressionBuilder(expr)
-        return dummy_value(pytypes.BytesType, location)
+                return BytesExpressionBuilder(expr, pytypes.VarBytesType)
+        return dummy_value(pytypes.VarBytesType, location)
 
 
 class BytesExpressionBuilder(InstanceExpressionBuilder[pytypes.RuntimeType]):
-    def __init__(self, expr: Expression):
-        super().__init__(pytypes.BytesType, expr)
+    def __init__(self, expr: Expression, typ: pytypes.PyType = pytypes.VarBytesType):
+        assert isinstance(typ, pytypes.BytesType)
+        super().__init__(typ, expr)
 
     @typing.override
     def to_bytes(self, location: SourceLocation) -> Expression:
@@ -212,7 +222,7 @@ class BytesExpressionBuilder(InstanceExpressionBuilder[pytypes.RuntimeType]):
 
     @typing.override
     def iterable_item_type(self) -> pytypes.PyType:
-        return pytypes.BytesType
+        return pytypes.VarBytesType
 
     @typing.override
     def bool_eval(self, location: SourceLocation, *, negate: bool = False) -> InstanceBuilder:
@@ -235,7 +245,7 @@ class BytesExpressionBuilder(InstanceExpressionBuilder[pytypes.RuntimeType]):
     @typing.override
     def contains(self, item: InstanceBuilder, location: SourceLocation) -> InstanceBuilder:
         item_expr = expect.argument_of_type_else_dummy(
-            item, pytypes.BytesType, resolve_literal=True
+            item, pytypes.VarBytesType, resolve_literal=True
         ).resolve()
         is_substring_expr = PuyaLibCall(
             func=PuyaLibFunction.is_substring,
@@ -248,7 +258,9 @@ class BytesExpressionBuilder(InstanceExpressionBuilder[pytypes.RuntimeType]):
     def compare(
         self, other: InstanceBuilder, op: BuilderComparisonOp, location: SourceLocation
     ) -> InstanceBuilder:
-        other = other.resolve_literal(converter=BytesTypeBuilder(other.source_location))
+        other = other.resolve_literal(
+            converter=BytesTypeBuilder(pytypes.VarBytesType, other.source_location)
+        )
         return compare_bytes(self=self, op=op, other=other, source_location=location)
 
     @typing.override
@@ -264,8 +276,10 @@ class BytesExpressionBuilder(InstanceExpressionBuilder[pytypes.RuntimeType]):
         if bytes_op is None:
             return NotImplemented
 
-        other = other.resolve_literal(converter=BytesTypeBuilder(other.source_location))
-        if not (pytypes.BytesType <= other.pytype):
+        other = other.resolve_literal(
+            converter=BytesTypeBuilder(pytypes.VarBytesType, other.source_location)
+        )
+        if not (pytypes.VarBytesType <= other.pytype):
             return NotImplemented
 
         lhs = self.resolve()

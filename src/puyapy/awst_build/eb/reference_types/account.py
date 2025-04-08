@@ -78,7 +78,7 @@ class AccountTypeBuilder(BytesBackedTypeBuilder):
             case None:
                 value: Expression = intrinsic_factory.zero_address(location)
             case _:
-                arg = expect.argument_of_type_else_dummy(arg, pytypes.BytesType)
+                arg = expect.argument_of_type_else_dummy(arg, pytypes.VarBytesType)
                 address_bytes_temp = arg.single_eval().resolve()
                 is_correct_length = NumericComparisonExpression(
                     operator=NumericComparison.eq,
@@ -101,7 +101,7 @@ class AccountTypeBuilder(BytesBackedTypeBuilder):
 
 class AccountExpressionBuilder(ReferenceValueExpressionBuilder):
     def __init__(self, expr: Expression):
-        native_type = pytypes.BytesType
+        native_type = pytypes.VarBytesType
         native_access_member = "bytes"
         field_mapping = {
             "balance": ("AcctBalance", pytypes.UInt64Type),

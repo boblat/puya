@@ -86,7 +86,7 @@ PYTYPE_TO_TYPE_BUILDER: dict[pytypes.PyType, CallableBuilderFromSourceFactory] =
     pytypes.AssetType: asset.AssetTypeBuilder,
     pytypes.ApplicationType: application.ApplicationTypeBuilder,
     pytypes.BigUIntType: biguint.BigUIntTypeBuilder,
-    pytypes.BytesType: bytes_.BytesTypeBuilder,
+    pytypes.VarBytesType: bytes_.VarBytesTypeBuilder,
     pytypes.StringType: string.StringTypeBuilder,
     pytypes.UInt64Type: uint64.UInt64TypeBuilder,
     pytypes.TransactionTypeType: uint64_enums.TransactionTypeTypeBuilder,
@@ -153,6 +153,7 @@ PYTYPE_GENERIC_TO_TYPE_BUILDER: dict[
     pytypes.GenericARC4BigUIntNType: arc4.UIntNTypeBuilder,
     pytypes.GenericARC4DynamicArrayType: arc4.DynamicArrayTypeBuilder,
     pytypes.GenericARC4StaticArrayType: arc4.StaticArrayTypeBuilder,
+    pytypes.GenericBytesType: bytes_.BytesTypeBuilder,
 }
 
 PYTYPE_BASE_TO_TYPE_BUILDER: dict[pytypes.PyType, CallableBuilderFromPyTypeAndSourceFactory] = {
@@ -172,7 +173,6 @@ PYTYPE_TO_BUILDER: dict[pytypes.PyType, Callable[[Expression], InstanceBuilder]]
     pytypes.AssetType: asset.AssetExpressionBuilder,
     pytypes.BigUIntType: biguint.BigUIntExpressionBuilder,
     pytypes.BoolType: bool_.BoolExpressionBuilder,
-    pytypes.BytesType: bytes_.BytesExpressionBuilder,
     pytypes.CompiledContractType: compiled.CompiledContractExpressionBuilder,
     pytypes.CompiledLogicSigType: compiled.CompiledLogicSigExpressionBuilder,
     pytypes.StringType: string.StringExpressionBuilder,
@@ -225,6 +225,7 @@ PYTYPE_GENERIC_TO_BUILDER: dict[
     pytypes.GenericBoxType: storage.BoxProxyExpressionBuilder,
     pytypes.GenericBoxMapType: storage.BoxMapProxyExpressionBuilder,
     pytypes.GenericArrayType: array.ArrayExpressionBuilder,
+    pytypes.GenericBytesType: bytes_.BytesExpressionBuilder,
     pytypes.GenericImmutableArrayType: immutable_array.ImmutableArrayExpressionBuilder,
     pytypes.GenericARC4DynamicArrayType: arc4.DynamicArrayExpressionBuilder,
     pytypes.GenericARC4StaticArrayType: arc4.StaticArrayExpressionBuilder,
