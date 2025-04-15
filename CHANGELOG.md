@@ -1,5 +1,12 @@
 # CHANGELOG
 <!--scriv-insert-here-->
+
+<a id='changelog-v4.7.1'></a>
+## v4.7.1 (2025-04-15)
+
+### docs
+
+-   Use scriv to manage change log entries instead of python-semantic-release automatically generating entries from commit messages
 <!--scriv-end-here-->
 
 ## v4.7.0 (2025-04-04)
